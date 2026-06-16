@@ -1229,12 +1229,9 @@ window.addEventListener('load', () => {
   fetchWeatherYesterday();
   fetchWeatherToday();
   initRates();
-  initNav(); // ตั้งค่า nav ก่อนเรียก loadFromSheets
+  // โหลดข้อมูลจาก Google Sheets
   if (API_URL && API_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-    loadFromSheets();
-  } else {
-    monthlyData = [62200,61800,63100,62800,61500,67261,64500,63800,62100,61200,60800,59448,62300,63000,64100,65200,63800,62100,61800,60900,61200,62100,61938,62300,61500,63000,62800,61200,60500,59800,60100];
-    demandData  = [4200,4150,4300,4280,4100,4603,4420,4350,4200,4100,4050,4154,4230,4300,4410,4510,4380,4210,4180,4090,4120,4210,4310,4200,4100,4300,4280,4100,4020,3980,4050];
+    initDashboard();
   }
 });
 
@@ -1255,249 +1252,23 @@ function showPage(name) {
 const API_URL = 'https://script.google.com/macros/s/AKfycbzcPR43CQ-oVMiNmZ-w9IAMKw8PB6DJg2w27249FnzHC3J2SoqsA9upjR0En073zc-_ng/exec';
 
 // ─── DATA ARRAYS (จะถูกแทนที่ด้วยข้อมูลจาก Sheets) ──
-let monthlyData = Array(31).fill(null);
-let demandData  = Array(31).fill(null);
-let avg2566     = 4154;
-let dataLoaded  = false;
-let monthData   = null; // global cache สำหรับ updateKpiFromDate
+// ═══════════════════════════════════════════════════════════════
+// DATA LAYER — เขียนใหม่ทั้งหมด (สะอาด ตรงไปตรงมา)
+// ═══════════════════════════════════════════════════════════════
+let monthlyData = Array(31).fill(null);  // kWh รายวันของเดือนที่กำลังดู
+let demandData  = Array(31).fill(null);  // onpeak kW รายวัน
+let avg2566     = 4154;                  // baseline เฉลี่ยของเดือนนี้
+let monthRows   = [];                    // ข้อมูลดิบทั้งเดือนจาก Sheets
+let loadedYear  = null;                  // เดือน/ปีที่ load ไว้ใน cache ตอนนี้
+let loadedMonth = null;
 
-// ─── LOAD FROM SHEETS ─────────────────────────────────
-let _currentYear  = new Date().getFullYear();
-let _currentMonth = new Date().getMonth() + 1;
+const MONTH_TH = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
-// ─── NAV HELPERS ─────────────────────────────────────────────
-function getNavValues() {
-  const ySel = document.getElementById('nav-year');
-  const mSel = document.getElementById('nav-month');
-  return {
-    year:  ySel ? parseInt(ySel.value) : _currentYear,
-    month: mSel ? parseInt(mSel.value) : _currentMonth
-  };
-}
+const numFmt = n => (n === '' || n === null || n === undefined || isNaN(parseFloat(n)))
+  ? '—' : Number(parseFloat(n).toFixed(0)).toLocaleString();
 
-function initNav() {
-  // ใช้ lastSavedDate ใน localStorage เป็น default ถ้ามี
-  const saved = localStorage.getItem('lastSavedDate');
-  let y, m;
-  if (saved) {
-    [y, m] = saved.split('-').map(Number);
-  } else {
-    const now = new Date();
-    y = now.getFullYear();
-    m = now.getMonth() + 1;
-  }
-  const ySel = document.getElementById('nav-year');
-  if (ySel) {
-    if (![...ySel.options].find(o => parseInt(o.value) === y)) {
-      const opt = document.createElement('option');
-      opt.value = y; opt.textContent = y + 543;
-      ySel.appendChild(opt);
-    }
-    ySel.value = y;
-  }
-  const mSel = document.getElementById('nav-month');
-  if (mSel) mSel.value = m;
-}
-
-function shiftMonth(delta) {
-  const { year, month } = getNavValues();
-  let m = month + delta, y = year;
-  if (m > 12) { m = 1; y++; }
-  if (m < 1)  { m = 12; y--; }
-  const ySel = document.getElementById('nav-year');
-  if (ySel && ![...ySel.options].find(o => parseInt(o.value) === y)) {
-    const opt = document.createElement('option');
-    opt.value = y; opt.textContent = y + 543;
-    ySel.appendChild(opt);
-  }
-  if (ySel) ySel.value = y;
-  document.getElementById('nav-month').value = m;
-  loadFromSheets();
-}
-
-function onNavChange() { loadFromSheets(); }
-
-async function loadFromSheets() {
-  clearKpis();
-  showApiStatus('loading');
-  try {
-    // ใช้ nav เสมอ (nav ถูก init ก่อนเรียกครั้งแรกแล้ว)
-    const { year, month } = getNavValues();
-
-    _currentYear  = year;
-    _currentMonth = month;
-
-    // ถ้า date picker มีค่าเดือนอื่นอยู่ → reset ให้ตรงเดือนที่กำลังดู
-    const dp = document.getElementById('dash-date-picker');
-    if (dp) {
-      const dpMonth = dp.value ? parseInt(dp.value.split('-')[1]) : 0;
-      const dpYear  = dp.value ? parseInt(dp.value.split('-')[0]) : 0;
-      if (dpMonth !== month || dpYear !== year) {
-        dp.value = `${year}-${String(month).padStart(2,'0')}-01`;
-      }
-    }
-
-    const [monthRes, baselineRes] = await Promise.all([
-      fetch(`${API_URL}?action=getMonth&year=${year}&month=${month}`),
-      fetch(`${API_URL}?action=getBaseline`)
-    ]);
-
-    monthData = await monthRes.json();
-    const baselineData = await baselineRes.json();
-
-    // อัปเดต monthlyData และ demandData จาก Sheets
-    monthlyData = Array(31).fill(null);
-    demandData  = Array(31).fill(null);
-    if (monthData.rows && monthData.rows.length > 0) {
-      monthData.rows.forEach(row => {
-        const day = parseInt(row.date.split('-')[2]) - 1; // 0-indexed
-        if (row.kwh)        monthlyData[day] = parseFloat(row.kwh);
-        if (row.onpeak_kw)  demandData[day]  = parseFloat(row.onpeak_kw);
-      });
-    }
-
-    // อัปเดต baseline avg2566
-    if (baselineData.rows && month) {
-      const bl = baselineData.rows.find(r => parseInt(r.month) === month);
-      if (bl) avg2566 = parseFloat(bl.avg_kwh_per_day) || avg2566;
-    }
-
-    dataLoaded = true;
-    refreshCharts();
-
-    // ── อัปเดต KPI จากวันที่เลือก (date picker) หรือวันล่าสุด ──
-    if (monthData.rows && monthData.rows.length > 0) {
-      const fmt = n => n ? Number(parseFloat(n).toFixed(0)).toLocaleString() : '—';
-
-      // หาวันที่ที่ต้องการแสดง: ถ้ามี date picker ให้ใช้ ถ้าไม่มีใช้วันล่าสุด
-      const dp = document.getElementById('dash-date-picker');
-      const selectedDate = dp && dp.value ? dp.value : null;
-      let targetRow = null;
-
-      if (selectedDate) {
-        targetRow = monthData.rows.find(r => r.date === selectedDate);
-      }
-      if (!targetRow) {
-        // fallback: วันล่าสุดที่มี kwh
-        const sorted = [...monthData.rows].sort((a,b) => b.date.localeCompare(a.date));
-        targetRow = sorted.find(r => r.kwh) || sorted[0];
-      }
-
-      if (targetRow.kwh)
-        document.getElementById('kpi-daily').innerHTML = fmt(targetRow.kwh) + '<span class="kpi-unit">kWh</span>';
-      if (targetRow.onpeak_kw)
-        document.getElementById('kpi-demand').innerHTML = fmt(targetRow.onpeak_kw) + '<span class="kpi-unit" style="color:var(--gold);">kW</span>';
-      if (targetRow.total_water_m3)
-        document.getElementById('kpi-water').textContent = fmt(targetRow.total_water_m3);
-
-      // Max/Min จากทุกวันในเดือน
-      const validKwh = monthData.rows.filter(r => r.kwh).map(r => ({ val: parseFloat(r.kwh), date: r.date }));
-      if (validKwh.length > 0) {
-        const maxR = validKwh.reduce((a,b) => a.val > b.val ? a : b);
-        const minR = validKwh.reduce((a,b) => a.val < b.val ? a : b);
-        document.getElementById('kpi-max').innerHTML = fmt(maxR.val) + '<span class="kpi-unit">kWh</span>';
-        document.getElementById('kpi-max-date').textContent = 'วันที่ ' + parseInt(maxR.date.split('-')[2]);
-        document.getElementById('kpi-min').innerHTML = fmt(minR.val) + '<span class="kpi-unit">kWh</span>';
-        document.getElementById('kpi-min-date').textContent = 'วันที่ ' + parseInt(minR.date.split('-')[2]);
-      }
-
-      // dashDate — แสดงวันที่ที่เลือก (แก้ timezone โดย parse เอง ไม่ใช้ new Date)
-      const [dy, dm, dd] = targetRow.date.split('-').map(Number);
-      const dateObj = new Date(dy, dm - 1, dd); // local time ไม่มี UTC offset
-      document.getElementById('dashDate').textContent = dateObj.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
-
-      // อัปเดตชื่อกราฟให้ตรงกับเดือนที่กำลังดู
-      const MONTH_TH = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-                        'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-      const chartTitleEl = document.getElementById('energy-chart-title');
-      if (chartTitleEl) chartTitleEl.textContent = `กราฟพลังงานเดือน${MONTH_TH[month]}`;
-    }
-
-    // Annual kWh
-    fetch(`${API_URL}?action=getAnnual&year=${_currentYear}`, { redirect: 'follow' })
-      .then(r => r.json())
-      .then(res => {
-        if (res.annual_kwh)
-          document.getElementById('kpi-annual').textContent = Number(res.annual_kwh).toLocaleString();
-      }).catch(() => {});
-
-    if (monthData.rows && monthData.rows.length > 0) {
-      showApiStatus('ok', `โหลดข้อมูลจาก Sheets แล้ว (${monthData.count || monthData.rows.length} วัน)`);
-    } else {
-      showApiStatus('err', 'ไม่มีข้อมูลในเดือนนี้ — ลองเลือกวันที่อื่น หรือกรอกข้อมูลในหน้า "กรอกข้อมูล" ก่อน');
-    }
-  } catch (err) {
-    showApiStatus('err', 'ไม่สามารถเชื่อมต่อ Sheets — แสดงข้อมูล Demo');
-    console.warn('Sheets API error:', err);
-    // fallback: ใช้ข้อมูล demo เดิม
-    monthlyData = [62200,61800,63100,62800,61500,67261,64500,63800,62100,61200,60800,59448,62300,63000,64100,65200,63800,62100,61800,60900,61200,62100,61938,62300,61500,63000,62800,61200,60500,59800,60100];
-    demandData  = [4200,4150,4300,4280,4100,4603,4420,4350,4200,4100,4050,4154,4230,4300,4410,4510,4380,4210,4180,4090,4120,4210,4310,4200,4100,4300,4280,4100,4020,3980,4050];
-    refreshCharts();
-  }
-}
-
-// ─── LOAD FROM DATE PICKER ──────────────────────────────
-function loadFromDatePicker() {
-  const dp = document.getElementById('dash-date-picker');
-  if (!dp || !dp.value) { showApiStatus('err', 'กรุณาเลือกวันที่ก่อน'); return; }
-  const [y, m] = dp.value.split('-').map(Number);
-
-  // อัปเดต nav ให้ตรงกับเดือน/ปีที่เลือกเสมอ
-  const ySel = document.getElementById('nav-year');
-  if (ySel && ![...ySel.options].find(o => parseInt(o.value) === y)) {
-    const opt = document.createElement('option');
-    opt.value = y; opt.textContent = y + 543;
-    ySel.appendChild(opt);
-  }
-  if (ySel) ySel.value = y;
-  document.getElementById('nav-month').value = m;
-
-  // ถ้าเดือน/ปีเดิม → ไม่ต้อง fetch ใหม่
-  if (y === _currentYear && m === _currentMonth && monthData && monthData.rows) {
-    updateKpiFromDate(dp.value);
-    return;
-  }
-  loadFromSheets();
-}
-
-// อัปเดต KPI + dashDate จากวันที่ที่เลือก (ไม่ fetch ใหม่)
-function updateKpiFromDate(dateStr) {
-  if (!monthData || !monthData.rows) return;
-  const fmt = n => n ? Number(parseFloat(n).toFixed(0)).toLocaleString() : '—';
-
-  // หา row ของวันที่เลือก
-  let row = monthData.rows.find(r => r.date === dateStr);
-  if (!row) {
-    showApiStatus('err', `ไม่มีข้อมูลวันที่ ${dateStr} ใน Sheets`);
-    return;
-  }
-
-  // KPI หลัก
-  document.getElementById('kpi-daily').innerHTML   = fmt(row.kwh) + '<span class="kpi-unit">kWh</span>';
-  document.getElementById('kpi-demand').innerHTML  = fmt(row.onpeak_kw) + '<span class="kpi-unit" style="color:var(--gold);">kW</span>';
-  if (row.total_water_m3) document.getElementById('kpi-water').textContent = fmt(row.total_water_m3);
-
-  // Energy Bands
-  document.getElementById('band-onpeak').textContent  = fmt(row.onpeak_kw)  || '—';
-  document.getElementById('band-offpeak').textContent = fmt(row.offpeak_kw) || '—';
-  document.getElementById('band-partial').textContent = fmt(row.partial_kw) || '—';
-
-  // อุณหภูมิ & ความชื้น
-  if (row.temp_out_day)   document.getElementById('temp-avg').textContent      = row.temp_out_day   + '°C';
-  if (row.temp_out_max)   document.getElementById('temp-max').textContent      = row.temp_out_max   + '°C';
-  if (row.temp_in_day)    document.getElementById('temp-in-day').textContent   = row.temp_in_day    + '°C';
-  if (row.temp_in_night)  document.getElementById('temp-in-night').textContent = row.temp_in_night  + '°C';
-  if (row.rh_out_day)     document.getElementById('humidity-out').textContent  = row.rh_out_day     + '%';
-  if (row.rh_in_day)      document.getElementById('humidity-in').textContent   = row.rh_in_day      + '%';
-
-  // dashDate (parse local ไม่ใช้ UTC)
-  const [dy, dm, dd] = dateStr.split('-').map(Number);
-  const dateObj = new Date(dy, dm - 1, dd);
-  document.getElementById('dashDate').textContent = dateObj.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
-
-  showApiStatus('ok', `แสดงข้อมูลวันที่ ${dateStr}`);
-}
-
+// ─── STATUS BAR ───────────────────────────────────────────────
 function showApiStatus(type, msg) {
   const el = document.getElementById('api-status');
   if (!el) return;
@@ -1508,25 +1279,218 @@ function showApiStatus(type, msg) {
   };
   const icons = { loading: '⏳', ok: '✅', err: '⚠️' };
   el.style.cssText = `${styles[type]}border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;`;
-  el.textContent = `${icons[type]} ${msg || (type === 'loading' ? 'กำลังโหลดข้อมูลจาก Google Sheets...' : '')}`;
+  el.textContent = `${icons[type]} ${msg || ''}`;
   el.style.display = 'block';
-  // ซ่อนอัตโนมัติหลัง 5 วินาที (ยกเว้น loading)
   if (type !== 'loading') {
-    clearTimeout(el._hideTimer);
-    el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, 5000);
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
   }
 }
 
-// ล้าง KPI ก่อนโหลดเดือนใหม่
-function clearKpis() {
-  const ids = ['kpi-daily','kpi-demand','kpi-max','kpi-min','kpi-water',
-               'band-onpeak','band-offpeak','band-partial',
-               'temp-avg','temp-max','temp-in-day','temp-in-night',
-               'humidity-out','humidity-in','cost-demand','cost-energy'];
-  ids.forEach(id => {
+// ─── ENTRY POINT: เลือกวันที่แล้วกดโหลด ───────────────────────
+async function loadFromDatePicker() {
+  const dp = document.getElementById('dash-date-picker');
+  if (!dp || !dp.value) { showApiStatus('err', 'กรุณาเลือกวันที่ก่อน'); return; }
+
+  const [y, m] = dp.value.split('-').map(Number);
+
+  // ถ้าเดือน/ปี ตรงกับที่ load ไว้แล้ว → ใช้ cache ไม่ fetch ใหม่
+  if (y === loadedYear && m === loadedMonth) {
+    renderDay(dp.value);
+    return;
+  }
+
+  // เดือนใหม่ → fetch
+  await fetchMonth(y, m);
+  renderDay(dp.value);
+}
+
+// ─── FETCH ข้อมูลทั้งเดือนจาก Sheets ──────────────────────────
+async function fetchMonth(year, month) {
+  showApiStatus('loading', 'กำลังโหลดข้อมูลจาก Google Sheets...');
+  clearAll();
+
+  try {
+    const [monthRes, baseRes] = await Promise.all([
+      fetch(`${API_URL}?action=getMonth&year=${year}&month=${month}`, { redirect: 'follow' }),
+      fetch(`${API_URL}?action=getBaseline`, { redirect: 'follow' })
+    ]);
+    const monthJson = await monthRes.json();
+    const baseJson  = await baseRes.json();
+
+    monthRows   = monthJson.rows || [];
+    loadedYear  = year;
+    loadedMonth = month;
+
+    // เติม monthlyData / demandData (index = วัน-1)
+    monthlyData = Array(31).fill(null);
+    demandData  = Array(31).fill(null);
+    monthRows.forEach(row => {
+      const day = parseInt(row.date.split('-')[2]) - 1;
+      if (day < 0 || day > 30) return;
+      if (row.kwh !== '' && row.kwh != null)             monthlyData[day] = parseFloat(row.kwh);
+      if (row.onpeak_kw !== '' && row.onpeak_kw != null) demandData[day]  = parseFloat(row.onpeak_kw);
+    });
+
+    // baseline ของเดือนนี้
+    if (baseJson.rows) {
+      const bl = baseJson.rows.find(r => parseInt(r.month) === month);
+      if (bl && bl.avg_kwh_per_day) avg2566 = parseFloat(bl.avg_kwh_per_day);
+    }
+
+    // วาดกราฟทั้งเดือน
+    renderMonth(month);
+
+    // annual
+    fetch(`${API_URL}?action=getAnnual&year=${year}`, { redirect: 'follow' })
+      .then(r => r.json())
+      .then(res => {
+        if (res.annual_kwh) document.getElementById('kpi-annual').textContent = Number(res.annual_kwh).toLocaleString();
+      }).catch(() => {});
+
+    if (monthRows.length > 0) {
+      showApiStatus('ok', `โหลดข้อมูลเดือน${MONTH_TH[month]} ${year+543} แล้ว (${monthRows.length} วัน)`);
+    } else {
+      showApiStatus('err', `ไม่มีข้อมูลเดือน${MONTH_TH[month]} ${year+543}`);
+    }
+  } catch (err) {
+    showApiStatus('err', 'เชื่อมต่อ Google Sheets ไม่สำเร็จ: ' + err.message);
+    console.error(err);
+    monthRows = []; loadedYear = null; loadedMonth = null;
+  }
+}
+
+// ─── RENDER กราฟ + ค่ารวมทั้งเดือน ────────────────────────────
+function renderMonth(month) {
+  // Energy line + avg line
+  if (window._energyChart) {
+    const valid = monthlyData.filter(v => v !== null && v > 0);
+    const avg   = valid.length ? valid.reduce((a,b)=>a+b,0)/valid.length : null;
+    window._energyChart.data.datasets[0].data = monthlyData;
+    window._energyChart.data.datasets[1].data = avg ? Array(31).fill(avg) : [];
+    window._energyChart.update();
+  }
+  // Demand bars
+  if (window._demandChart) {
+    const validD = demandData.filter(x => x);
+    const maxD = validD.length ? Math.max(...validD) : null;
+    const minD = validD.length ? Math.min(...validD) : null;
+    window._demandChart.data.datasets[0].data = demandData;
+    window._demandChart.data.datasets[0].backgroundColor = demandData.map(
+      v => v === maxD ? '#F59E0B' : v === minD ? '#3B82F6' : '#1E4A9C'
+    );
+    if (window._demandChart.data.datasets[1])
+      window._demandChart.data.datasets[1].data = Array(31).fill(avg2566);
+    window._demandChart.update();
+  }
+
+  // Max/Min KPI (ทั้งเดือน)
+  const validKwh = monthRows.filter(r => r.kwh !== '' && r.kwh != null)
+                            .map(r => ({ val: parseFloat(r.kwh), day: parseInt(r.date.split('-')[2]) }));
+  if (validKwh.length > 0) {
+    const maxR = validKwh.reduce((a,b) => a.val > b.val ? a : b);
+    const minR = validKwh.reduce((a,b) => a.val < b.val ? a : b);
+    document.getElementById('kpi-max').innerHTML = numFmt(maxR.val) + '<span class="kpi-unit">kWh</span>';
+    document.getElementById('kpi-max-date').textContent = 'วันที่ ' + maxR.day;
+    document.getElementById('kpi-min').innerHTML = numFmt(minR.val) + '<span class="kpi-unit">kWh</span>';
+    document.getElementById('kpi-min-date').textContent = 'วันที่ ' + minR.day;
+  }
+
+  // ชื่อกราฟ
+  const titleEl = document.getElementById('energy-chart-title');
+  if (titleEl) titleEl.textContent = `กราฟพลังงานเดือน${MONTH_TH[month]}`;
+
+  // Donut (สัดส่วนประเภทวัน)
+  renderDonut(loadedYear, month);
+
+  recalcRates();
+}
+
+// ─── RENDER ค่า KPI ของ "วันเดียว" ────────────────────────────
+function renderDay(dateStr) {
+  const row = monthRows.find(r => r.date === dateStr);
+  if (!row) {
+    showApiStatus('err', `ไม่มีข้อมูลวันที่ ${dateStr}`);
+    return;
+  }
+
+  // KPI หลัก
+  document.getElementById('kpi-daily').innerHTML  = numFmt(row.kwh) + '<span class="kpi-unit">kWh</span>';
+  document.getElementById('kpi-demand').innerHTML = numFmt(row.onpeak_kw) + '<span class="kpi-unit" style="color:var(--gold);">kW</span>';
+
+  // เทียบ baseline
+  if (row.onpeak_kw && avg2566) {
+    const diff = ((parseFloat(row.onpeak_kw) - avg2566) / avg2566 * 100);
+    const cmp = document.getElementById('kpi-compare');
+    if (cmp) {
+      cmp.textContent = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
+      cmp.style.cssText = diff >= 0
+        ? 'background:rgba(16,185,129,.2);color:#6EE7B7;'
+        : 'background:rgba(239,68,68,.2);color:#FCA5A5;';
+    }
+  }
+
+  // Energy bands
+  document.getElementById('band-onpeak').textContent  = numFmt(row.onpeak_kw);
+  document.getElementById('band-offpeak').textContent = numFmt(row.offpeak_kw);
+  document.getElementById('band-partial').textContent = numFmt(row.partial_kw);
+
+  // อุณหภูมิ & ความชื้น
+  const setTxt = (id, val, suffix) => {
     const el = document.getElementById(id);
-    if (el) el.textContent = '—';
-  });
+    if (el) el.textContent = (val === '' || val == null) ? '—' : (val + suffix);
+  };
+  setTxt('temp-avg',      row.temp_out_day,   '°C');
+  setTxt('temp-max',      row.temp_out_max,   '°C');
+  setTxt('temp-in-day',   row.temp_in_day,    '°C');
+  setTxt('temp-in-night', row.temp_in_night,  '°C');
+  setTxt('humidity-out',  row.rh_out_day,     '%');
+  setTxt('humidity-in',   row.rh_in_day,      '%');
+
+  // น้ำ
+  if (row.total_water_m3 !== '' && row.total_water_m3 != null)
+    document.getElementById('kpi-water').textContent = numFmt(row.total_water_m3);
+
+  // dashDate (parse แบบ local ไม่ใช้ UTC)
+  const [yy, mm, dd] = dateStr.split('-').map(Number);
+  document.getElementById('dashDate').textContent =
+    new Date(yy, mm - 1, dd).toLocaleDateString('th-TH', {year:'numeric',month:'long',day:'numeric'});
+
+  showApiStatus('ok', `แสดงข้อมูลวันที่ ${dd} ${MONTH_TH[mm]} ${yy+543}`);
+}
+
+// ─── DONUT: สัดส่วนประเภทวันในเดือน ──────────────────────────
+function renderDonut(year, month) {
+  const daysInMo = new Date(year, month, 0).getDate();
+  let wd = 0, we = 0, ev = 0;
+  // ดึง event days จาก localStorage (ที่กรอกไว้)
+  const evSet = (typeof eventDays !== 'undefined' && eventDays) ? eventDays : new Set();
+  for (let d = 1; d <= daysInMo; d++) {
+    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(year, month-1, d).getDay();
+    if (evSet.has(ds)) ev++;
+    else if (dow === 0 || dow === 6) we++;
+    else wd++;
+  }
+  const wdP = Math.round(wd/daysInMo*100);
+  const weP = Math.round(we/daysInMo*100);
+  const evP = 100 - wdP - weP;
+  if (window._donutChart) {
+    window._donutChart.data.datasets[0].data = [wdP, weP, evP];
+    window._donutChart.update();
+  }
+  const big = document.querySelector('.donut-big');
+  if (big) big.textContent = '100%';
+  const set = (id,v) => { const e=document.getElementById(id); if(e) e.textContent = v+'%'; };
+  set('legend-wd', wdP); set('legend-we', weP); set('legend-ev', evP);
+}
+
+// ─── ล้างค่าทั้งหมด ───────────────────────────────────────────
+function clearAll() {
+  const dash = id => { const e=document.getElementById(id); if(e) e.textContent='—'; };
+  ['band-onpeak','band-offpeak','band-partial','temp-avg','temp-max',
+   'temp-in-day','temp-in-night','humidity-out','humidity-in',
+   'kpi-water','pct-chiller','pct-mall'].forEach(dash);
   document.getElementById('kpi-daily').innerHTML  = '—<span class="kpi-unit">kWh</span>';
   document.getElementById('kpi-demand').innerHTML = '—<span class="kpi-unit" style="color:var(--gold);">kW</span>';
   document.getElementById('kpi-max').innerHTML    = '—<span class="kpi-unit">kWh</span>';
@@ -1536,27 +1500,22 @@ function clearKpis() {
   document.getElementById('dashDate').textContent = '— รอข้อมูล —';
 }
 
-function refreshCharts() {
-  // อัปเดต chart data ใหม่
-  if (window._energyChart) {
-    const valid = monthlyData.filter(v => v !== null && v > 0);
-    const avg   = valid.length ? valid.reduce((a,b)=>a+b,0)/valid.length : null;
-    window._energyChart.data.datasets[0].data = monthlyData;
-    if (avg) window._energyChart.data.datasets[1].data = Array(31).fill(avg);
-    window._energyChart.update();
+// ─── เปิดหน้าครั้งแรก ─────────────────────────────────────────
+async function initDashboard() {
+  const dp = document.getElementById('dash-date-picker');
+  // default: วันล่าสุดที่บันทึก (localStorage) หรือเมื่อวาน
+  let defDate = localStorage.getItem('lastViewedDate');
+  if (!defDate) {
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    defDate = y.toISOString().split('T')[0];
   }
-  if (window._demandChart) {
-    window._demandChart.data.datasets[0].data = demandData;
-    window._demandChart.data.datasets[0].backgroundColor = demandData.map(
-      v => v === Math.max(...demandData.filter(x=>x)) ? '#F59E0B'
-         : v === Math.min(...demandData.filter(x=>x)) ? '#3B82F6'
-         : '#1E4A9C'
-    );
-    window._demandChart.data.datasets[1].data = Array(31).fill(avg2566);
-    window._demandChart.update();
-  }
-  recalcRates();
+  if (dp) dp.value = defDate;
+
+  const [yy, mm] = defDate.split('-').map(Number);
+  await fetchMonth(yy, mm);
+  renderDay(defDate);
 }
+
 let demandChartInstance = null;
 
 // ─── CHARTS ───
@@ -1924,54 +1883,41 @@ function saveData() {
   if (dateRaw) {
     const d = new Date(dateRaw);
     document.getElementById('dashDate').textContent = thaiDate(d);
-    // จำปี/เดือนล่าสุดที่บันทึกเสมอ (ใช้ตอนโหลด Dashboard ครั้งถัดไป)
-    const [sy, sm] = dateRaw.split('-').map(Number);
-    localStorage.setItem('lastSavedDate', `${sy}-${sm}`);
-    _currentYear = sy; _currentMonth = sm;
   }
 
   // Update demand chart event colors
   updateDemandChart();
 
-  // ── POST ไป Google Sheets ──
+  // ── บันทึกลง Google Sheets (GET + params เลี่ยง CORS) ──
   if (API_URL && API_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-    const payload = {
-      action: 'upsertDay',   // update ถ้ามีวันนั้นแล้ว, insert ถ้ายังไม่มี
-      data: {
-        date:           dateRaw,
-        kwh:            daily,
-        onpeak_kw:      demand,
-        offpeak_kw:     offpeak,
-        partial_kw:     partial,
-        temp_out_day:   tempAvg,
-        temp_out_night: tempInNight,
-        temp_out_max:   tempMax,
-        temp_in_day:    tempInDay,
-        temp_in_night:  tempInNight,
-        rh_out_day:     humOut,
-        rh_in_day:      humIn,
-        total_water_m3: water
-      }
-    };
-    fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    }).then(r => r.json())
-      .then(res => {
+    const params = new URLSearchParams({
+      action:         'saveDay',
+      date:           dateRaw,
+      kwh:            daily       || '',
+      onpeak_kw:      demand      || '',
+      offpeak_kw:     offpeak     || '',
+      partial_kw:     partial     || '',
+      temp_out_day:   tempAvg     || '',
+      temp_out_max:   tempMax     || '',
+      temp_in_day:    tempInDay   || '',
+      temp_in_night:  tempInNight || '',
+      rh_out_day:     humOut      || '',
+      rh_in_day:      humIn       || '',
+      total_water_m3: water       || ''
+    });
+    fetch(`${API_URL}?${params.toString()}`, { redirect: 'follow' })
+      .then(r => r.json())
+      .then(async res => {
         showApiStatus('ok', `บันทึก ${dateRaw} ลง Sheets แล้ว (${res.status})`);
+        localStorage.setItem('lastViewedDate', dateRaw);
+        // โหลดเดือนนั้นใหม่ (cache invalidate) แล้วแสดงวันที่บันทึก
         const [sy, sm] = dateRaw.split('-').map(Number);
-        localStorage.setItem('lastSavedDate', `${sy}-${sm}`);
-        _currentYear = sy; _currentMonth = sm;
-        // อัปเดต nav ให้ตรงกับเดือนที่บันทึก แล้ว reload
-        const ySel = document.getElementById('nav-year');
-        if (ySel && ![...ySel.options].find(o => parseInt(o.value) === sy)) {
-          const opt = document.createElement('option');
-          opt.value = sy; opt.textContent = sy + 543;
-          ySel.appendChild(opt);
-        }
-        if (ySel) ySel.value = sy;
-        document.getElementById('nav-month').value = sm;
-        loadFromSheets();
+        loadedYear = null; loadedMonth = null; // บังคับ fetch ใหม่
+        await fetchMonth(sy, sm);
+        renderDay(dateRaw);
+        // sync date picker
+        const dp = document.getElementById('dash-date-picker');
+        if (dp) dp.value = dateRaw;
       })
       .catch(err => showApiStatus('err', 'บันทึกลง Sheets ไม่สำเร็จ: ' + err.message));
   }
