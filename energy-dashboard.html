@@ -1229,11 +1229,10 @@ window.addEventListener('load', () => {
   fetchWeatherYesterday();
   fetchWeatherToday();
   initRates();
-  // โหลดข้อมูลจาก Google Sheets (วันล่าสุดอัตโนมัติ)
+  initNav(); // ตั้งค่า nav ก่อนเรียก loadFromSheets
   if (API_URL && API_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
     loadFromSheets();
   } else {
-    // ใช้ข้อมูล demo ถ้ายังไม่ได้ตั้งค่า API
     monthlyData = [62200,61800,63100,62800,61500,67261,64500,63800,62100,61200,60800,59448,62300,63000,64100,65200,63800,62100,61800,60900,61200,62100,61938,62300,61500,63000,62800,61200,60500,59800,60100];
     demandData  = [4200,4150,4300,4280,4100,4603,4420,4350,4200,4100,4050,4154,4230,4300,4410,4510,4380,4210,4180,4090,4120,4210,4310,4200,4100,4300,4280,4100,4020,3980,4050];
   }
@@ -1266,36 +1265,75 @@ let monthData   = null; // global cache สำหรับ updateKpiFromDate
 let _currentYear  = new Date().getFullYear();
 let _currentMonth = new Date().getMonth() + 1;
 
-async function loadFromSheets(forceYear, forceMonth) {
+// ─── NAV HELPERS ─────────────────────────────────────────────
+function getNavValues() {
+  const ySel = document.getElementById('nav-year');
+  const mSel = document.getElementById('nav-month');
+  return {
+    year:  ySel ? parseInt(ySel.value) : _currentYear,
+    month: mSel ? parseInt(mSel.value) : _currentMonth
+  };
+}
+
+function initNav() {
+  // ใช้ lastSavedDate ใน localStorage เป็น default ถ้ามี
+  const saved = localStorage.getItem('lastSavedDate');
+  let y, m;
+  if (saved) {
+    [y, m] = saved.split('-').map(Number);
+  } else {
+    const now = new Date();
+    y = now.getFullYear();
+    m = now.getMonth() + 1;
+  }
+  const ySel = document.getElementById('nav-year');
+  if (ySel) {
+    if (![...ySel.options].find(o => parseInt(o.value) === y)) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y + 543;
+      ySel.appendChild(opt);
+    }
+    ySel.value = y;
+  }
+  const mSel = document.getElementById('nav-month');
+  if (mSel) mSel.value = m;
+}
+
+function shiftMonth(delta) {
+  const { year, month } = getNavValues();
+  let m = month + delta, y = year;
+  if (m > 12) { m = 1; y++; }
+  if (m < 1)  { m = 12; y--; }
+  const ySel = document.getElementById('nav-year');
+  if (ySel && ![...ySel.options].find(o => parseInt(o.value) === y)) {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y + 543;
+    ySel.appendChild(opt);
+  }
+  if (ySel) ySel.value = y;
+  document.getElementById('nav-month').value = m;
+  loadFromSheets();
+}
+
+function onNavChange() { loadFromSheets(); }
+
+async function loadFromSheets() {
   showApiStatus('loading');
   try {
-    let year, month;
-
-    if (forceYear && forceMonth) {
-      // เรียกจาก saveData หรือ date picker — ใช้ปี/เดือนที่ระบุ
-      year  = forceYear;
-      month = forceMonth;
-    } else {
-      // เปิดหน้าครั้งแรก — ใช้ lastSavedDate จาก localStorage
-      const saved = localStorage.getItem('lastSavedDate');
-      if (saved) {
-        const [sy, sm] = saved.split('-').map(Number);
-        year  = sy;
-        month = sm;
-      } else {
-        year  = new Date().getFullYear();
-        month = new Date().getMonth() + 1;
-      }
-    }
+    // ใช้ nav เสมอ (nav ถูก init ก่อนเรียกครั้งแรกแล้ว)
+    const { year, month } = getNavValues();
 
     _currentYear  = year;
     _currentMonth = month;
 
-    // อัปเดต date picker ให้ตรงกับเดือนที่กำลังดู
+    // ถ้า date picker มีค่าเดือนอื่นอยู่ → reset ให้ตรงเดือนที่กำลังดู
     const dp = document.getElementById('dash-date-picker');
-    if (dp && !dp.value) {
-      // set เป็นวันสุดท้ายของเดือน (จะอัปเดตอีกทีหลังได้ข้อมูล)
-      dp.value = `${year}-${String(month).padStart(2,'0')}-01`;
+    if (dp) {
+      const dpMonth = dp.value ? parseInt(dp.value.split('-')[1]) : 0;
+      const dpYear  = dp.value ? parseInt(dp.value.split('-')[0]) : 0;
+      if (dpMonth !== month || dpYear !== year) {
+        dp.value = `${year}-${String(month).padStart(2,'0')}-01`;
+      }
     }
 
     const [monthRes, baselineRes] = await Promise.all([
@@ -1401,19 +1439,23 @@ async function loadFromSheets(forceYear, forceMonth) {
 function loadFromDatePicker() {
   const dp = document.getElementById('dash-date-picker');
   if (!dp || !dp.value) { showApiStatus('err', 'กรุณาเลือกวันที่ก่อน'); return; }
+  const [y, m] = dp.value.split('-').map(Number);
 
-  const [y, m, d] = dp.value.split('-').map(Number);
+  // อัปเดต nav ให้ตรงกับเดือน/ปีที่เลือกเสมอ
+  const ySel = document.getElementById('nav-year');
+  if (ySel && ![...ySel.options].find(o => parseInt(o.value) === y)) {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y + 543;
+    ySel.appendChild(opt);
+  }
+  if (ySel) ySel.value = y;
+  document.getElementById('nav-month').value = m;
 
-  // ถ้าเดือน/ปีเดิม → ไม่ต้อง fetch ใหม่ แค่อัปเดต KPI จาก cache
+  // ถ้าเดือน/ปีเดิม → ไม่ต้อง fetch ใหม่
   if (y === _currentYear && m === _currentMonth && monthData && monthData.rows) {
     updateKpiFromDate(dp.value);
     return;
   }
-
-  // เดือนต่างกัน → อัปเดต nav แล้วโหลดใหม่
-  document.getElementById('nav-month').value = m;
-  const ySel = document.getElementById('nav-year');
-  if (ySel) ySel.value = y;
   loadFromSheets();
 }
 
@@ -1892,11 +1934,19 @@ function saveData() {
     }).then(r => r.json())
       .then(res => {
         showApiStatus('ok', `บันทึก ${dateRaw} ลง Sheets แล้ว (${res.status})`);
-        // จำวันที่ล่าสุดที่บันทึก เพื่อใช้ตอน reload หน้า Dashboard
         const [sy, sm] = dateRaw.split('-').map(Number);
         localStorage.setItem('lastSavedDate', `${sy}-${sm}`);
         _currentYear = sy; _currentMonth = sm;
-        loadFromSheets(sy, sm);
+        // อัปเดต nav ให้ตรงกับเดือนที่บันทึก แล้ว reload
+        const ySel = document.getElementById('nav-year');
+        if (ySel && ![...ySel.options].find(o => parseInt(o.value) === sy)) {
+          const opt = document.createElement('option');
+          opt.value = sy; opt.textContent = sy + 543;
+          ySel.appendChild(opt);
+        }
+        if (ySel) ySel.value = sy;
+        document.getElementById('nav-month').value = sm;
+        loadFromSheets();
       })
       .catch(err => showApiStatus('err', 'บันทึกลง Sheets ไม่สำเร็จ: ' + err.message));
   }
