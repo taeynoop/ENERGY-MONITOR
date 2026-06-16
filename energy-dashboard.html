@@ -1326,19 +1326,32 @@ async function loadFromSheets(forceYear, forceMonth) {
     dataLoaded = true;
     refreshCharts();
 
-    // ── อัปเดต KPI จากข้อมูลวันล่าสุดใน Sheets ──
+    // ── อัปเดต KPI จากวันที่เลือก (date picker) หรือวันล่าสุด ──
     if (monthData.rows && monthData.rows.length > 0) {
-      // เรียงวันที่ หาวันล่าสุดที่มีข้อมูล kwh
-      const sorted = [...monthData.rows].sort((a,b) => b.date.localeCompare(a.date));
-      const latest = sorted.find(r => r.kwh) || sorted[0];
       const fmt = n => n ? Number(parseFloat(n).toFixed(0)).toLocaleString() : '—';
 
-      if (latest.kwh)
-        document.getElementById('kpi-daily').innerHTML = fmt(latest.kwh) + '<span class="kpi-unit">kWh</span>';
-      if (latest.onpeak_kw)
-        document.getElementById('kpi-demand').innerHTML = fmt(latest.onpeak_kw) + '<span class="kpi-unit" style="color:var(--gold);">kW</span>';
+      // หาวันที่ที่ต้องการแสดง: ถ้ามี date picker ให้ใช้ ถ้าไม่มีใช้วันล่าสุด
+      const dp = document.getElementById('dash-date-picker');
+      const selectedDate = dp && dp.value ? dp.value : null;
+      let targetRow = null;
 
-      // Max/Min จาก monthlyData
+      if (selectedDate) {
+        targetRow = monthData.rows.find(r => r.date === selectedDate);
+      }
+      if (!targetRow) {
+        // fallback: วันล่าสุดที่มี kwh
+        const sorted = [...monthData.rows].sort((a,b) => b.date.localeCompare(a.date));
+        targetRow = sorted.find(r => r.kwh) || sorted[0];
+      }
+
+      if (targetRow.kwh)
+        document.getElementById('kpi-daily').innerHTML = fmt(targetRow.kwh) + '<span class="kpi-unit">kWh</span>';
+      if (targetRow.onpeak_kw)
+        document.getElementById('kpi-demand').innerHTML = fmt(targetRow.onpeak_kw) + '<span class="kpi-unit" style="color:var(--gold);">kW</span>';
+      if (targetRow.total_water_m3)
+        document.getElementById('kpi-water').textContent = fmt(targetRow.total_water_m3);
+
+      // Max/Min จากทุกวันในเดือน
       const validKwh = monthData.rows.filter(r => r.kwh).map(r => ({ val: parseFloat(r.kwh), date: r.date }));
       if (validKwh.length > 0) {
         const maxR = validKwh.reduce((a,b) => a.val > b.val ? a : b);
@@ -1349,12 +1362,16 @@ async function loadFromSheets(forceYear, forceMonth) {
         document.getElementById('kpi-min-date').textContent = 'วันที่ ' + parseInt(minR.date.split('-')[2]);
       }
 
-      if (latest.total_water_m3)
-        document.getElementById('kpi-water').textContent = fmt(latest.total_water_m3);
+      // dashDate — แสดงวันที่ที่เลือก (แก้ timezone โดย parse เอง ไม่ใช้ new Date)
+      const [dy, dm, dd] = targetRow.date.split('-').map(Number);
+      const dateObj = new Date(dy, dm - 1, dd); // local time ไม่มี UTC offset
+      document.getElementById('dashDate').textContent = dateObj.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
 
-      // วันที่ล่าสุด (แสดงวันที่ของ row ล่าสุด)
-      const d = new Date(latest.date);
-      document.getElementById('dashDate').textContent = d.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+      // อัปเดตชื่อกราฟให้ตรงกับเดือนที่กำลังดู
+      const MONTH_TH = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                        'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+      const chartTitleEl = document.querySelector('#page-dashboard .chart-title');
+      if (chartTitleEl) chartTitleEl.textContent = `กราฟพลังงานเดือน${MONTH_TH[month]}`;
     }
 
     // Annual kWh
