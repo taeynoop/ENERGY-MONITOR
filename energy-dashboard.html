@@ -1328,9 +1328,9 @@ async function loadFromSheets(forceYear, forceMonth) {
 
     // ── อัปเดต KPI จากข้อมูลวันล่าสุดใน Sheets ──
     if (monthData.rows && monthData.rows.length > 0) {
-      // เรียงวันที่ หาวันล่าสุด
+      // เรียงวันที่ หาวันล่าสุดที่มีข้อมูล kwh
       const sorted = [...monthData.rows].sort((a,b) => b.date.localeCompare(a.date));
-      const latest = sorted[0];
+      const latest = sorted.find(r => r.kwh) || sorted[0];
       const fmt = n => n ? Number(parseFloat(n).toFixed(0)).toLocaleString() : '—';
 
       if (latest.kwh)
