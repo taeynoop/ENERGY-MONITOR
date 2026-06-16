@@ -1,0 +1,2599 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>รายงานภาพรวมการใช้พลังงาน – Imperial World</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root {
+    --navy: #0A1F44;
+    --navy-mid: #163172;
+    --navy-light: #1E4A9C;
+    --accent: #2563EB;
+    --accent-soft: #3B82F6;
+    --sky: #DBEAFE;
+    --white: #FFFFFF;
+    --off-white: #F0F4FF;
+    --border: #C7D7F5;
+    --text-primary: #0A1F44;
+    --text-muted: #5A6E9A;
+    --success: #059669;
+    --warning: #D97706;
+    --danger: #DC2626;
+    --gold: #F59E0B;
+
+    --font-body: 'IBM Plex Sans Thai', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--off-white);
+    color: var(--text-primary);
+    min-height: 100vh;
+  }
+
+  /* ─── TOP NAV ─── */
+  .topbar {
+    background: var(--navy);
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(10,31,68,.4);
+  }
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .3px;
+  }
+  .topbar-brand .dot {
+    width: 10px; height: 10px;
+    background: var(--gold);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.3)} }
+  .topbar-nav {
+    display: flex;
+    gap: 4px;
+  }
+  .nav-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,.65);
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 7px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .2px;
+  }
+  .nav-btn:hover { background: rgba(255,255,255,.1); color: var(--white); }
+  .nav-btn.active { background: var(--accent); color: var(--white); }
+  .topbar-date {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: rgba(255,255,255,.55);
+    letter-spacing: .5px;
+  }
+
+  /* ─── PAGE CONTAINER ─── */
+  .page { display: none; padding: 28px; max-width: 1440px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* ─── SECTION HEADER ─── */
+  .section-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+  }
+  .section-heading {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--navy);
+  }
+  .report-date {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--border);
+    padding: 5px 12px;
+    border-radius: 20px;
+  }
+
+  /* ─── GRID HELPERS ─── */
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
+  .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
+
+  /* ─── KPI CARD ─── */
+  .kpi-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow .2s;
+  }
+  .kpi-card:hover { box-shadow: 0 6px 24px rgba(30,74,156,.1); }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent);
+  }
+  .kpi-card.navy-card {
+    background: var(--navy);
+    color: var(--white);
+    border-color: var(--navy);
+  }
+  .kpi-card.navy-card::before { background: var(--gold); }
+  .kpi-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .navy-card .kpi-label { color: rgba(255,255,255,.6); }
+  .kpi-value {
+    font-family: var(--font-mono);
+    font-size: 38px;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1;
+  }
+  .navy-card .kpi-value { color: var(--white); }
+  .kpi-unit {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-left: 5px;
+  }
+  .navy-card .kpi-unit { color: rgba(255,255,255,.6); }
+  .kpi-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .navy-card .kpi-sub { color: rgba(255,255,255,.55); }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--sky);
+    color: var(--accent);
+  }
+  .badge.green { background: #D1FAE5; color: var(--success); }
+  .badge.red { background: #FEE2E2; color: var(--danger); }
+
+  /* ─── CHART CARD ─── */
+  .chart-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 24px;
+    position: relative;
+  }
+  .chart-card:hover { box-shadow: 0 6px 24px rgba(30,74,156,.08); }
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 4px;
+  }
+  .chart-sub {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  /* ─── TEMP ROW ─── */
+  .temp-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .temp-item {
+    flex: 1;
+    background: var(--off-white);
+    border-radius: 10px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .temp-val {
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--navy);
+  }
+  .temp-lbl { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+  /* ─── SECTION SPACER ─── */
+  .spacer { margin-top: 24px; }
+
+  /* ─── ENERGY TIME BANDS ─── */
+  .band-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 0;
+  }
+  .band-card {
+    flex: 1;
+    border-radius: 10px;
+    padding: 16px 18px;
+    text-align: center;
+    border: 1.5px solid transparent;
+  }
+  .band-card.on-peak { background: #FFF7ED; border-color: #FDBA74; }
+  .band-card.off-peak { background: #F0FDF4; border-color: #86EFAC; }
+  .band-card.partial { background: #EFF6FF; border-color: #93C5FD; }
+  .band-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+  .band-val { font-family: var(--font-mono); font-size: 22px; font-weight: 600; }
+  .band-card.on-peak .band-val { color: #C2410C; }
+  .band-card.off-peak .band-val { color: #15803D; }
+  .band-card.partial .band-val { color: #1D4ED8; }
+  .band-unit { font-size: 11px; color: var(--text-muted); }
+
+  /* ─── DONUT WRAPPER ─── */
+  .donut-wrap { position: relative; width: 160px; height: 160px; margin: 0 auto; }
+  .donut-center {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    pointer-events: none;
+  }
+  .donut-big { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: var(--navy); }
+  .donut-sm { font-size: 10px; color: var(--text-muted); }
+
+  /* ─── COST BOX ─── */
+  .cost-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 0; }
+  .cost-card {
+    background: var(--navy);
+    border-radius: 14px;
+    padding: 22px 24px;
+    color: var(--white);
+  }
+  .cost-card.alt { background: var(--navy-light); }
+  .cost-label { font-size: 11.5px; color: rgba(255,255,255,.6); font-weight: 600; letter-spacing: .5px; margin-bottom: 8px; }
+  .cost-val { font-family: var(--font-mono); font-size: 32px; font-weight: 700; color: var(--white); }
+  .cost-unit { font-size: 14px; font-weight: 500; margin-left: 4px; color: var(--gold); }
+
+  /* ─── AC OPERATION ─── */
+  .ac-box {
+    background: linear-gradient(135deg, var(--navy-mid), var(--navy));
+    border-radius: 14px;
+    padding: 24px;
+    color: var(--white);
+  }
+  .ac-box .ac-title { font-size: 13px; font-weight: 700; letter-spacing: .3px; margin-bottom: 16px; color: rgba(255,255,255,.75); }
+  .ac-big { font-family: var(--font-mono); font-size: 48px; font-weight: 700; color: var(--white); line-height: 1; }
+  .ac-unit-label { font-size: 14px; color: rgba(255,255,255,.6); margin-top: 2px; margin-bottom: 16px; }
+  .ac-condition {
+    background: rgba(255,255,255,.08);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 12.5px;
+    color: rgba(255,255,255,.75);
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+  .ac-note { font-size: 11px; color: rgba(255,255,255,.45); line-height: 1.6; }
+
+  /* ─── DIVIDER ─── */
+  .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+  /* ──────────── FORM PAGE ──────────── */
+  .form-wrap {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .form-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 36px;
+    margin-bottom: 20px;
+  }
+  .form-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .form-section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--navy);
+    letter-spacing: .2px;
+  }
+  label span.req { color: var(--danger); margin-left: 2px; }
+  input, select, textarea {
+    font-family: var(--font-body);
+    font-size: 14px;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    background: var(--off-white);
+    transition: border-color .2s, box-shadow .2s;
+    outline: none;
+    width: 100%;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    background: var(--white);
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  .input-unit {
+    display: flex;
+    align-items: center;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--off-white);
+    overflow: hidden;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .input-unit:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    background: var(--white);
+  }
+  .input-unit input {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    flex: 1;
+  }
+  .input-unit input:focus { box-shadow: none; background: transparent; }
+  .unit-suffix {
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--border);
+    border-left: 1.5px solid var(--border);
+    white-space: nowrap;
+  }
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+  .btn {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 11px 28px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .2px;
+  }
+  .btn-primary {
+    background: var(--navy);
+    color: var(--white);
+  }
+  .btn-primary:hover { background: var(--navy-light); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(10,31,68,.3); }
+  .btn-secondary {
+    background: var(--off-white);
+    color: var(--navy);
+    border: 1.5px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--border); }
+  .save-toast {
+    display: none;
+    position: fixed;
+    bottom: 28px; right: 28px;
+    background: var(--success);
+    color: var(--white);
+    padding: 14px 22px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    z-index: 999;
+    box-shadow: 0 6px 24px rgba(5,150,105,.3);
+    animation: slideUp .3s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+  /* ─── LEGEND ─── */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ─── PROGRESS BAR ─── */
+  .prog-wrap { margin-top: 12px; }
+  .prog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .prog-label { width: 70px; font-size: 12px; color: var(--text-muted); }
+  .prog-bar { flex: 1; height: 8px; background: var(--off-white); border-radius: 4px; overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 4px; transition: width .6s; }
+  .prog-val { width: 40px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); text-align: right; }
+
+  /* ─── EVENT CALENDAR ─── */
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1.5px solid var(--border);
+    background: var(--white);
+    color: var(--text-primary);
+    transition: all .15s;
+    user-select: none;
+    position: relative;
+  }
+  .cal-day:hover { border-color: var(--accent); background: var(--sky); }
+  .cal-day.event {
+    background: #FEF3C7;
+    border-color: #F59E0B;
+    color: #92400E;
+  }
+  .cal-day.event::after {
+    content: '★';
+    position: absolute;
+    top: 2px; right: 4px;
+    font-size: 8px;
+    color: #F59E0B;
+  }
+  .cal-day.empty { background: transparent; border-color: transparent; cursor: default; }
+  .cal-day.today { border-color: var(--accent-soft); color: var(--accent); }
+  .cal-day.weekend { color: #9CA3AF; }
+  .cal-day.event.weekend { color: #92400E; }
+
+
+  .water-card {
+    background: linear-gradient(135deg, #0EA5E9, var(--navy-light));
+    border-radius: 14px;
+    padding: 22px 24px;
+    color: var(--white);
+    text-align: center;
+  }
+  .water-val { font-family: var(--font-mono); font-size: 42px; font-weight: 700; line-height: 1; }
+  .water-unit { font-size: 15px; color: rgba(255,255,255,.85); margin-top: 4px; }
+  .water-label { font-size: 12px; color: rgba(255,255,255,.9); margin-top: 8px; font-weight: 600; letter-spacing: .3px; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="dot"></div>
+    <span>ENERGY MONITOR</span>
+    <span style="opacity:.3; font-weight:300">|</span>
+    <span style="font-weight:400; opacity:.8">Imperial World</span>
+  </div>
+  <div class="topbar-nav">
+    <button class="nav-btn active" onclick="showPage('dashboard')">📊 Dashboard</button>
+    <button class="nav-btn" onclick="showPage('entry')">✏️ กรอกข้อมูล</button>
+    <button class="nav-btn" onclick="saveSnapshot()" id="btn-snapshot" style="background:rgba(245,158,11,.15);color:#F59E0B;border:1px solid rgba(245,158,11,.3);">
+      📸 บันทึกภาพ
+    </button>
+  </div>
+  <div id="api-status" style="display:none;"></div>
+  <div class="topbar-date" id="topbarDate"></div>
+</div>
+
+<!-- ═══════════ DASHBOARD PAGE ═══════════ -->
+<div class="page active" id="page-dashboard">
+
+  <!-- HEADER -->
+  <div class="section-header">
+    <div>
+      <div class="section-title">Energy Overview Report</div>
+      <div class="section-heading">รายงานภาพรวมการใช้พลังงาน</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+      <div style="display:flex;align-items:center;gap:8px;background:var(--off-white);border:1.5px solid var(--border);border-radius:10px;padding:6px 12px;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted);white-space:nowrap;">ดูข้อมูลวันที่</label>
+        <input type="date" id="dash-date-picker" style="font-family:var(--font-body);font-size:13px;font-weight:600;border:none;background:transparent;color:var(--navy);cursor:pointer;" onchange="loadFromDatePicker()">
+        <button onclick="loadFromDatePicker()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;">โหลด</button>
+      </div>
+      <div class="report-date" id="dashDate">— รอข้อมูล —</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: KPIs -->
+  <div class="grid-4">
+    <div class="kpi-card navy-card">
+      <div class="kpi-label">การใช้พลังงานประจำวัน</div>
+      <div class="kpi-value" id="kpi-daily">—<span class="kpi-unit">kWh</span></div>
+      <div class="kpi-sub"><span class="badge" style="background:rgba(245,158,11,.15);color:#F59E0B">kWh/Day</span></div>
+    </div>
+    <div class="kpi-card" style="background:linear-gradient(135deg,#1E3A8A,#2563EB);border-color:#1E3A8A;box-shadow:0 6px 24px rgba(37,99,235,.35);">
+      <div class="kpi-label" style="color:rgba(255,255,255,.65);">ความต้องการพลังงาน/วัน</div>
+      <div class="kpi-value" style="color:#fff;font-size:44px;" id="kpi-demand">—<span class="kpi-unit" style="color:var(--gold);">kW</span></div>
+      <div class="kpi-sub" style="color:rgba(255,255,255,.6);">เทียบเฉลี่ยปี 2566 <span class="badge" style="background:rgba(16,185,129,.2);color:#6EE7B7;" id="kpi-compare">+0.31%</span></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">พลังงานสูงสุด / เดือน</div>
+      <div class="kpi-value" id="kpi-max">—<span class="kpi-unit">kWh</span></div>
+      <div class="kpi-sub" id="kpi-max-date">รอข้อมูล</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">พลังงานต่ำสุด / เดือน</div>
+      <div class="kpi-value" id="kpi-min">—<span class="kpi-unit">kWh</span></div>
+      <div class="kpi-sub" id="kpi-min-date">รอข้อมูล</div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ROW 2: Energy Bands + Donut + Temp -->
+  <div style="display:grid;grid-template-columns:1.2fr 0.8fr 1fr;gap:16px;">
+
+    <!-- Energy Time Bands -->
+    <div class="chart-card">
+      <div class="chart-title">ช่วงเวลาการใช้พลังงาน</div>
+      <div class="chart-sub">Energy Time Bands – ประจำวัน</div>
+      <div class="band-row">
+        <div class="band-card on-peak">
+          <div class="band-label">On-Peak</div>
+          <div class="band-val" id="band-onpeak">—</div>
+          <div class="band-unit">kWh</div>
+        </div>
+        <div class="band-card off-peak">
+          <div class="band-label">Off-Peak</div>
+          <div class="band-val" id="band-offpeak">—</div>
+          <div class="band-unit">kWh</div>
+        </div>
+        <div class="band-card partial">
+          <div class="band-label">Partial</div>
+          <div class="band-val" id="band-partial">—</div>
+          <div class="band-unit">kWh</div>
+        </div>
+      </div>
+      <div style="margin-top:18px;">
+        <div class="chart-title" style="font-size:12px;margin-bottom:8px;">สัดส่วนตาม Chiller vs ศูนยการค้า</div>
+        <div class="prog-wrap">
+          <div class="prog-row">
+            <div class="prog-label">Chiller</div>
+            <div class="prog-bar"><div class="prog-fill" style="width:0%;background:var(--accent-soft);"></div></div>
+            <div class="prog-val" id="pct-chiller">—</div>
+          </div>
+          <div class="prog-row">
+            <div class="prog-label">ศูนย์การค้า</div>
+            <div class="prog-bar"><div class="prog-fill" style="width:0%;background:var(--navy);"></div></div>
+            <div class="prog-val" id="pct-mall">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Donut: Day type breakdown -->
+    <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div class="chart-title" style="text-align:center;">การใช้พลังงานแยกตามวัน</div>
+      <div class="chart-sub" style="text-align:center;">สัดส่วน % ต่อประเภทวัน</div>
+      <div class="donut-wrap">
+        <canvas id="donutChart"></canvas>
+        <div class="donut-center">
+          <div class="donut-big">—</div>
+          <div class="donut-sm">รวมทั้งหมด</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;width:100%;">
+        <div class="legend" style="justify-content:center;">
+          <div class="legend-item"><div class="legend-dot" style="background:#1E4A9C;"></div> จ-ศ <span id="legend-wd">—</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#3B82F6;"></div> ส-อา <span id="legend-we">—</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#F59E0B;"></div> Event <span id="legend-ev">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Temperature + Humidity -->
+    <div class="chart-card">
+      <div class="chart-title">อุณหภูมิ & ความชื้น</div>
+      <div class="chart-sub">สภาพแวดล้อมประจำวัน</div>
+      <div class="temp-row">
+        <div class="temp-item">
+          <div class="temp-val" id="temp-avg">—</div>
+          <div class="temp-lbl">ภายนอกเฉลี่ย</div>
+        </div>
+        <div class="temp-item">
+          <div class="temp-val" id="temp-max">—</div>
+          <div class="temp-lbl">ภายนอกสูงสุด</div>
+        </div>
+      </div>
+      <div class="temp-row">
+        <div class="temp-item">
+          <div class="temp-val" id="temp-in-day">—</div>
+          <div class="temp-lbl">ภายในกลางวัน<br>(10:00–18:00)</div>
+        </div>
+        <div class="temp-item">
+          <div class="temp-val" id="temp-in-night">—</div>
+          <div class="temp-lbl">ภายในกลางคืน<br>(18:00–20:00)</div>
+        </div>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:10px;">
+        <div class="temp-item" style="flex:1;">
+          <div class="temp-val" style="font-size:20px;" id="humidity-out">—</div>
+          <div class="temp-lbl">ความชื้นสัมพัทธ์ภายนอก</div>
+        </div>
+        <div class="temp-item" style="flex:1;">
+          <div class="temp-val" style="font-size:20px;" id="humidity-in">—</div>
+          <div class="temp-lbl">ความชื้นสัมพัทธ์ภายใน</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ROW 3: Energy Graph + AC Operation -->
+  <div class="grid-2-1">
+
+    <!-- Monthly Energy Graph -->
+    <div class="chart-card">
+      <div class="chart-title">กราฟพลังงานเดือนตุลาคม</div>
+      <div class="chart-sub">การใช้พลังงานรายวัน (kWh) – เทียบแนวโน้ม</div>
+      <!-- Legend -->
+      <div style="display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 4px;align-items:center;">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:24px;height:3px;background:#1E4A9C;border-radius:2px;"></div>
+          <span style="font-size:10px;color:#5A6E9A;">การใช้พลังงานรายวัน (kWh)</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:10px;height:10px;background:#EF4444;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1.5px #EF4444;"></div>
+          <span style="font-size:10px;color:#5A6E9A;">วันที่ใช้พลังงานสูงสุด</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:24px;height:2px;border-top:2px dashed #F59E0B;"></div>
+          <span style="font-size:10px;color:#5A6E9A;">ค่าเฉลี่ยการใช้พลังงานต่อวัน</span>
+        </div>
+      </div>
+      <canvas id="energyChart" height="100"></canvas>
+    </div>
+
+    <!-- AC Operation -->
+    <div class="ac-box">
+      <div class="ac-title">⚙️ การ Operate ระบบปรับอากาศ<br>ประจำวันที่ <span id="ac-date">16 มิถุนายน 2569</span></div>
+      <div class="ac-big" id="ac-ton">2,000</div>
+      <div class="ac-unit-label">Ton – แผนการเปิดระบบ</div>
+      <div class="ac-condition">
+        🌡️ อุณหภูมิภายนอกสูงสุด: <strong id="ac-temp">32°C</strong><br>
+        💧 ความชื้นสัมพัทธ์: <strong id="ac-rh">32%RH</strong>
+      </div>
+      <div class="ac-note">จะพิจารณาดำเนินการปรับลด/เพิ่มการใช้งานระบบปรับอากาศให้สอดคล้องกับสภาพอากาศและความต้องการของศูนย์การค้า</div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ROW 4: Demand Chart + Cost + Water -->
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+
+    <!-- Demand kW Chart -->
+    <div class="chart-card">
+      <div class="chart-title">ความต้องการพลังงานไฟฟ้า On-Peak</div>
+      <div class="chart-sub">kW รายวัน เทียบค่าสูงสุด/ต่ำสุด และค่าเฉลี่ยปี 2566</div>
+      <!-- Legend -->
+      <div style="display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 4px;align-items:center;">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:14px;height:10px;background:#1E4A9C;border-radius:2px;"></div>
+          <span style="font-size:10px;color:#5A6E9A;">ความต้องการปกติ (kW)</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:14px;height:10px;background:#F59E0B;border-radius:2px;"></div>
+          <span style="font-size:10px;color:#5A6E9A;">สูงสุดของเดือน</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:14px;height:10px;background:#3B82F6;border-radius:2px;"></div>
+          <span style="font-size:10px;color:#5A6E9A;">ต่ำสุดของเดือน</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:14px;height:10px;background:#EF4444;border-radius:2px;"></div>
+          <span style="font-size:10px;color:#5A6E9A;">วันที่มี Event</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:24px;height:2px;border-top:2px dashed #DC2626;"></div>
+          <span style="font-size:10px;color:#5A6E9A;">ค่าเฉลี่ยปี 2566</span>
+        </div>
+      </div>
+      <canvas id="demandChart" height="110"></canvas>
+    </div>
+
+    <!-- Cost + Water -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <!-- Water (ขึ้นมาด้านบน) -->
+      <div class="water-card" style="padding:12px 20px;display:flex;align-items:center;justify-content:space-between;text-align:left;">
+        <div class="water-label" style="margin-bottom:0;color:rgba(255,255,255,.9);font-weight:600;">การใช้น้ำประปาประจำวัน</div>
+        <div style="display:flex;align-items:baseline;gap:6px;">
+          <div class="water-val" id="kpi-water" style="font-size:28px;">—</div>
+          <div class="water-unit" style="font-size:13px;">m³/วัน</div>
+        </div>
+      </div>
+
+      <!-- Cost row (ลด padding) -->
+      <div class="cost-row">
+        <div class="cost-card" style="padding:14px 18px;">
+          <div class="cost-label">ค่าความต้องการพลังงาน On-Peak</div>
+          <div class="cost-val" style="font-size:24px;"><span id="cost-demand">—</span><span class="cost-unit">฿</span></div>
+        </div>
+        <div class="cost-card alt" style="padding:14px 18px;">
+          <div class="cost-label">ค่าพลังงานไฟฟ้าคาดการณ์</div>
+          <div class="cost-val" style="font-size:24px;"><span id="cost-energy">—</span><span class="cost-unit">฿</span></div>
+        </div>
+      </div>
+
+      <!-- Annual (เด่นขึ้น) -->
+      <div class="kpi-card navy-card" style="text-align:center;padding:20px 22px;">
+        <div class="kpi-label" style="color:rgba(255,255,255,.6);letter-spacing:1.5px;">การใช้พลังงานสะสม (ปี)</div>
+        <div style="font-family:var(--font-mono);font-size:32px;font-weight:700;color:var(--white);line-height:1.1;margin:8px 0 4px;">
+          <span id="kpi-annual">—</span><span style="font-size:15px;font-weight:500;color:var(--gold);margin-left:6px;">kWh</span>
+        </div>
+        <div style="font-size:12px;color:rgba(255,255,255,.5);" id="kpi-annual-sub">ณ เดือนตุลาคม 2567</div>
+      </div>
+
+      <!-- หมายเหตุ — ไม่มีกรอบ อยู่ในคอลัมน์เดียวกัน -->
+      <div style="padding:4px 6px;line-height:1.65;">
+        <div style="font-size:10.5px;font-weight:700;color:#94A3B8;letter-spacing:.5px;margin-bottom:4px;">หมายเหตุ</div>
+        <div style="font-size:10px;color:#94A3B8;">มูลค่าพลังงานไฟฟ้าคาดการณ์เป็นผลจากการวิเคราะห์ข้อมูล เพื่อประมาณการค่าใช้จ่ายของศูนย์การค้า โดยอ้างอิงจากข้อมูลที่รวบรวมและวิเคราะห์อย่างละเอียด ทั้งนี้ อาจมีความคลาดเคลื่อนอันเนื่องมาจากพฤติกรรมการใช้พลังงานภายในศูนย์การค้า</div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- end dashboard page -->
+
+<!-- ═══════════ DATA ENTRY PAGE ═══════════ -->
+<div class="page" id="page-entry">
+  <div class="form-wrap">
+    <div class="section-header">
+      <div>
+        <div class="section-title">Data Input Form</div>
+        <div class="section-heading">กรอกข้อมูลพลังงานประจำวัน</div>
+      </div>
+    </div>
+
+    <!-- Section 1: General -->
+    <div class="form-card">
+      <div class="form-section-title">ข้อมูลทั่วไป</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>วันที่รายงาน <span class="req">*</span></label>
+          <input type="date" id="f-date" onchange="syncMonthFromDate()">
+        </div>
+        <div class="form-group">
+          <label>เดือน (สำหรับสรุป)
+            <span id="month-lock-badge" style="font-size:10px;background:#DBEAFE;color:#1E40AF;padding:2px 8px;border-radius:20px;margin-left:6px;font-weight:600;">🔒 ล็อคตามวันที่</span>
+          </label>
+          <select id="f-month" onchange="onMonthManualChange()">
+            <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option><option value="3">มีนาคม</option>
+            <option value="4">เมษายน</option><option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
+            <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option><option value="9">กันยายน</option>
+            <option value="10">ตุลาคม</option><option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Energy -->
+    <div class="form-card">
+      <div class="form-section-title">ข้อมูลการใช้พลังงาน</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>การใช้พลังงานประจำวัน <span class="req">*</span></label>
+          <div class="input-unit"><input type="number" id="f-daily" placeholder="61938"><div class="unit-suffix">kWh/Day</div></div>
+        </div>
+        <div class="form-group">
+          <label>ความต้องการพลังงาน/วัน</label>
+          <div class="input-unit"><input type="number" id="f-demand" placeholder="4534"><div class="unit-suffix">kW</div></div>
+        </div>
+        <div class="form-group">
+          <label>พลังงานสูงสุดในเดือน</label>
+          <div class="input-unit"><input type="number" id="f-max" placeholder="67261"><div class="unit-suffix">kWh</div></div>
+        </div>
+        <div class="form-group">
+          <label>พลังงานต่ำสุดในเดือน</label>
+          <div class="input-unit"><input type="number" id="f-min" placeholder="59448"><div class="unit-suffix">kWh</div></div>
+        </div>
+        <div class="form-group">
+          <label>On-Peak</label>
+          <div class="input-unit"><input type="number" id="f-onpeak" placeholder="4603.20"><div class="unit-suffix">kWh</div></div>
+        </div>
+        <div class="form-group">
+          <label>Off-Peak</label>
+          <div class="input-unit"><input type="number" id="f-offpeak" placeholder="1588.80"><div class="unit-suffix">kWh</div></div>
+        </div>
+        <div class="form-group">
+          <label>Partial</label>
+          <div class="input-unit"><input type="number" id="f-partial" placeholder="5376.00"><div class="unit-suffix">kWh</div></div>
+        </div>
+        <div class="form-group">
+          <label>การใช้พลังงานสะสมปี (Annual)</label>
+          <div class="input-unit"><input type="number" id="f-annual" placeholder="21636340.80"><div class="unit-suffix">kWh/Year</div></div>
+        </div>
+        <div class="form-group">
+          <label>สัดส่วน Chiller</label>
+          <div class="input-unit"><input type="number" id="f-chiller-pct" placeholder="26" min="0" max="100"><div class="unit-suffix">%</div></div>
+        </div>
+        <div class="form-group">
+          <label>เปรียบเทียบค่าเฉลี่ยปี 2566</label>
+          <div class="input-unit"><input type="number" step="0.01" id="f-compare" placeholder="0.31"><div class="unit-suffix">%</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2b: Event Days Calendar -->
+    <div class="form-card">
+      <!-- Collapsible Header -->
+      <div onclick="toggleCalendar()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;">
+        <div class="form-section-title" style="margin-bottom:0;flex:1;">วันที่มีงาน Event / Convention Hall</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-left:12px;">
+          <span id="cal-event-badge" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;"></span>
+          <div id="cal-toggle-icon" style="width:28px;height:28px;border-radius:50%;background:var(--off-white);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--navy);transition:transform .2s;transform:rotate(-90deg);">▾</div>
+        </div>
+      </div>
+
+      <!-- Collapsible body -->
+      <div id="cal-body" style="display:none;margin-top:16px;">
+        <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:16px;">กดที่วันที่ที่มีงาน Event เพื่อ highlight <span style="color:#D97706;font-weight:700;">สีส้ม</span> ในกราฟ On-Peak — กดซ้ำเพื่อยกเลิก</p>
+
+        <!-- Month/Year selector -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <button onclick="changeCalMonth(-1)" style="background:var(--off-white);border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:16px;color:var(--navy);">‹</button>
+          <div id="cal-month-label" style="flex:1;text-align:center;font-size:15px;font-weight:700;color:var(--navy);"></div>
+          <button onclick="changeCalMonth(1)" style="background:var(--off-white);border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:16px;color:var(--navy);">›</button>
+        </div>
+
+        <!-- Day-of-week headers -->
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px;">
+          <div style="text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding:4px;">อา</div>
+          <div style="text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding:4px;">จ</div>
+          <div style="text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding:4px;">อ</div>
+          <div style="text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding:4px;">พ</div>
+          <div style="text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding:4px;">พฤ</div>
+          <div style="text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding:4px;">ศ</div>
+          <div style="text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding:4px;">ส</div>
+        </div>
+
+        <!-- Calendar grid -->
+        <div id="event-calendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
+
+        <!-- Selected summary -->
+        <div id="event-summary" style="margin-top:16px;padding:12px 14px;background:var(--off-white);border-radius:10px;font-size:12.5px;color:var(--text-muted);">
+          ยังไม่ได้เลือกวันมีงาน
+        </div>
+      </div>
+
+      <!-- Hidden field for Google Sheets export -->
+      <input type="hidden" id="f-event-days" value="">
+    </div>
+
+    <!-- Section 3: Temperature -->
+    <div class="form-card">
+      <div class="form-section-title">อุณหภูมิ & ความชื้น</div>
+
+      <!-- Weather Auto-fetch Banner -->
+      <div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border:1.5px solid #93C5FD;border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:28px;">🌤️</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#1E4A9C;">ดึงข้อมูลอากาศอัตโนมัติ</div>
+            <div style="font-size:12px;color:#5A6E9A;margin-top:2px;">Imperial World สำโรง, สมุทรปราการ (13.6608°N, 100.5954°E)</div>
+            <div style="font-size:11px;color:#5A6E9A;margin-top:1px;">แหล่งข้อมูล: Open-Meteo API · ฟรี · ไม่ต้อง API Key</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="fetchWeather()" id="weather-btn" style="white-space:nowrap;min-width:160px;">
+          🌡️ ดึงข้อมูลอากาศ
+        </button>
+      </div>
+
+      <!-- Weather status -->
+      <div id="weather-status" style="display:none;padding:10px 14px;border-radius:8px;font-size:12.5px;font-weight:500;margin-bottom:16px;"></div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>อุณหภูมิภายนอกเฉลี่ย <span style="font-size:10px;color:#3B82F6;font-weight:600;">● Auto</span></label>
+          <div class="input-unit"><input type="number" step="0.1" id="f-temp-avg" placeholder="32.6"><div class="unit-suffix">°C</div></div>
+        </div>
+        <div class="form-group">
+          <label>อุณหภูมิภายนอกสูงสุด <span style="font-size:10px;color:#3B82F6;font-weight:600;">● Auto</span></label>
+          <div class="input-unit"><input type="number" step="0.1" id="f-temp-max" placeholder="31.7"><div class="unit-suffix">°C</div></div>
+        </div>
+        <div class="form-group">
+          <label>อุณหภูมิภายนอกต่ำสุด <span style="font-size:10px;color:#3B82F6;font-weight:600;">● Auto</span></label>
+          <div class="input-unit"><input type="number" step="0.1" id="f-temp-min" placeholder="27.0"><div class="unit-suffix">°C</div></div>
+        </div>
+        <div class="form-group">
+          <label>ความชื้นสัมพัทธ์ภายนอก <span style="font-size:10px;color:#3B82F6;font-weight:600;">● Auto</span></label>
+          <div class="input-unit"><input type="number" step="0.1" id="f-humidity-out" placeholder="76.26"><div class="unit-suffix">%RH</div></div>
+        </div>
+        <div class="form-group">
+          <label>อุณหภูมิภายใน – กลางวัน (10:00–18:00)</label>
+          <div class="input-unit"><input type="number" step="0.1" id="f-temp-in-day" placeholder="24.9"><div class="unit-suffix">°C</div></div>
+        </div>
+        <div class="form-group">
+          <label>อุณหภูมิภายใน – กลางคืน (18:00–20:00)</label>
+          <div class="input-unit"><input type="number" step="0.1" id="f-temp-in-night" placeholder="25"><div class="unit-suffix">°C</div></div>
+        </div>
+        <div class="form-group">
+          <label>ความชื้นสัมพัทธ์ภายใน</label>
+          <div class="input-unit"><input type="number" step="0.1" id="f-humidity-in" placeholder="64.7"><div class="unit-suffix">%RH</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: AC Operation -->
+    <div class="form-card">
+      <div class="form-section-title">ระบบปรับอากาศ</div>
+
+      <!-- Today's Forecast Banner -->
+      <div style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border:1.5px solid #86EFAC;border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:24px;">⚙️</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#14532D;">พยากรณ์อากาศวันนี้ (สำหรับวางแผน AC)</div>
+            <div id="ac-forecast-status" style="font-size:12px;color:#166534;margin-top:2px;">กำลังดึงข้อมูลพยากรณ์...</div>
+          </div>
+        </div>
+        <button class="btn" onclick="fetchWeatherToday()" id="ac-forecast-btn" style="background:#15803D;color:#fff;white-space:nowrap;min-width:140px;font-size:13px;padding:9px 18px;">
+          🔄 รีเฟรช
+        </button>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>วันที่ Operate ระบบปรับอากาศ</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="date" id="f-ac-date" disabled style="flex:1;background:#F0F4FF;color:var(--navy);font-weight:600;">
+            <button type="button" id="btn-ac-date-edit" onclick="toggleAcDateEdit()"
+              style="font-family:var(--font-body);font-size:12px;font-weight:600;padding:8px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--off-white);color:var(--navy);cursor:pointer;white-space:nowrap;">
+              ✏️ แก้ไข
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>แผนการเปิดระบบ (Ton)</label>
+          <select id="f-ac-ton" style="font-family:var(--font-mono);font-weight:700;font-size:15px;">
+            <option value="500">500 Ton</option>
+            <option value="1000">1,000 Ton</option>
+            <option value="1500">1,500 Ton</option>
+            <option value="2000" selected>2,000 Ton</option>
+            <option value="2500">2,500 Ton</option>
+            <option value="3000">3,000 Ton</option>
+            <option value="3500">3,500 Ton</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>อุณหภูมิสูงสุดวันนี้ (พยากรณ์) <span style="font-size:10px;color:#15803D;font-weight:600;">● Forecast</span></label>
+          <div class="input-unit"><input type="number" step="0.1" id="f-ac-temp-max" placeholder="32"><div class="unit-suffix">°C</div></div>
+        </div>
+        <div class="form-group">
+          <label>ความชื้นสัมพัทธ์วันนี้ (พยากรณ์) <span style="font-size:10px;color:#15803D;font-weight:600;">● Forecast</span></label>
+          <div class="input-unit"><input type="number" step="0.1" id="f-ac-rh" placeholder="75"><div class="unit-suffix">%RH</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4b: น้ำประปา -->
+    <div class="form-card">
+      <div class="form-section-title">น้ำประปา</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>เลขมิเตอร์วันก่อนหน้า</label>
+          <div class="input-unit"><input type="number" id="f-meter-prev" placeholder="27553" oninput="calcWaterUsage()"><div class="unit-suffix">m³</div></div>
+        </div>
+        <div class="form-group">
+          <label>เลขมิเตอร์วันปัจจุบัน</label>
+          <div class="input-unit"><input type="number" id="f-meter-curr" placeholder="27626" oninput="calcWaterUsage()"><div class="unit-suffix">m³</div></div>
+        </div>
+      </div>
+      <!-- ผลลัพธ์การใช้น้ำ -->
+      <div id="water-result" style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border:1px solid #93C5FD;border-radius:10px;padding:12px 18px;margin-top:4px;display:flex;align-items:center;gap:12px;">
+        <span style="font-size:12px;color:#5A6E9A;">การใช้น้ำประจำวัน =</span>
+        <span id="water-calc-display" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--accent);">—</span>
+        <span style="font-size:13px;color:#5A6E9A;">m³</span>
+        <span id="water-calc-note" style="font-size:11px;color:var(--text-muted);margin-left:4px;"></span>
+      </div>
+      <input type="hidden" id="f-water" value="">
+    </div>
+
+
+    <!-- Section 5: อัตราค่าไฟ -->
+    <div class="form-card" id="rate-card">
+      <div class="form-section-title">อัตราค่าไฟฟ้า</div>
+
+      <!-- ── บาท/kW (On-Peak demand) ── -->
+      <div style="margin-bottom:28px;">
+        <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+          <span style="background:var(--navy);color:#fff;font-size:10px;padding:2px 8px;border-radius:20px;letter-spacing:.5px;">ON-PEAK</span>
+          อัตราค่าความต้องการพลังงาน (บาท/kW)
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="input-unit" style="max-width:200px;">
+            <input type="number" step="0.01" id="f-rate-kw" disabled
+              style="background:#F0F4FF;color:var(--navy);font-weight:700;font-family:var(--font-mono);">
+            <div class="unit-suffix">฿/kW</div>
+          </div>
+          <button id="btn-edit-kw" onclick="toggleEditKw()" class="btn btn-secondary" style="padding:9px 18px;font-size:13px;">
+            ✏️ แก้ไข
+          </button>
+          <button id="btn-save-kw" onclick="saveKw()" class="btn btn-primary" style="padding:9px 18px;font-size:13px;display:none;">
+            ✅ บันทึก
+          </button>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">⚠️ อัตรานี้ประกาศโดยการไฟฟ้า กดแก้ไขเมื่อมีการเปลี่ยนแปลง</div>
+      </div>
+
+      <!-- ── บาท/kWh (ค่าพลังงาน) ── -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+          <span style="background:var(--accent);color:#fff;font-size:10px;padding:2px 8px;border-radius:20px;letter-spacing:.5px;">ENERGY</span>
+          อัตราค่าพลังงานไฟฟ้า (บาท/kWh)
+        </div>
+
+        <!-- Mode toggle -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button id="btn-mode-auto" onclick="setKwhMode('auto')"
+            style="font-family:var(--font-body);font-size:13px;font-weight:600;padding:7px 18px;border-radius:8px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;transition:all .2s;">
+            ⚡ AUTO คำนวณ
+          </button>
+          <button id="btn-mode-manual" onclick="setKwhMode('manual')"
+            style="font-family:var(--font-body);font-size:13px;font-weight:600;padding:7px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--off-white);color:var(--navy);cursor:pointer;transition:all .2s;">
+            ✍️ กรอกเอง
+          </button>
+        </div>
+
+        <!-- AUTO: ตาราง 6 เดือน -->
+        <div id="rate-auto-section">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">กรอกข้อมูลบิลค่าไฟย้อนหลัง (จากบิลการไฟฟ้า) ระบบจะคำนวณ บาท/kWh เฉลี่ยให้อัตโนมัติ</div>
+          <div style="overflow-x:auto;">
+            <table id="rate-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead>
+                <tr style="background:var(--off-white);">
+                  <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;border-bottom:2px solid var(--border);">เดือน</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;border-bottom:2px solid var(--border);">kWh (จากบิล)</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;border-bottom:2px solid var(--border);">บาท (ก่อน VAT)</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;border-bottom:2px solid var(--border);">บาท/kWh</th>
+                </tr>
+              </thead>
+              <tbody id="rate-tbody"></tbody>
+              <tfoot>
+                <tr style="background:var(--navy);color:#fff;">
+                  <td style="padding:10px 12px;font-weight:700;font-size:12px;border-radius:0 0 0 8px;">เฉลี่ยรวม</td>
+                  <td style="padding:10px 12px;text-align:right;font-family:var(--font-mono);font-weight:700;" id="rate-total-kwh">—</td>
+                  <td style="padding:10px 12px;text-align:right;font-family:var(--font-mono);font-weight:700;" id="rate-total-baht">—</td>
+                  <td style="padding:10px 12px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--gold);border-radius:0 0 8px 0;" id="rate-avg-kwh">—</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div style="margin-top:12px;padding:12px 16px;border-radius:10px;font-size:13px;" id="rate-result-box">
+          </div>
+        </div>
+
+        <!-- MANUAL: กรอก บาท/kWh เอง -->
+        <div id="rate-manual-section" style="display:none;">
+          <div class="input-unit" style="max-width:200px;">
+            <input type="number" step="0.0001" id="f-rate-kwh-manual" placeholder="4.5000"
+              style="font-weight:700;font-family:var(--font-mono);">
+            <div class="unit-suffix">฿/kWh</div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">กรอกค่า บาท/kWh จากบิลการไฟฟ้าโดยตรง</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Costs -->
+    <div class="form-card">
+      <div class="form-section-title">คาดการณ์ค่าใช้จ่าย</div>
+
+      <!-- ── ค่าความต้องการพลังงานสูงสุด On-Peak ── -->
+      <div style="margin-bottom:28px;">
+        <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+          <span style="background:#DC2626;color:#fff;font-size:10px;padding:2px 8px;border-radius:20px;letter-spacing:.5px;">ON-PEAK DEMAND</span>
+          ค่าความต้องการพลังงานสูงสุด On-Peak (บาท)
+        </div>
+
+        <!-- Mode toggle -->
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button id="btn-dcost-auto" onclick="setDemandCostMode('auto')"
+            style="font-family:var(--font-body);font-size:13px;font-weight:600;padding:7px 18px;border-radius:8px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;transition:all .2s;">
+            ⚡ AUTO คำนวณ
+          </button>
+          <button id="btn-dcost-manual" onclick="setDemandCostMode('manual')"
+            style="font-family:var(--font-body);font-size:13px;font-weight:600;padding:7px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--off-white);color:var(--navy);cursor:pointer;transition:all .2s;">
+            ✍️ กรอกเอง
+          </button>
+        </div>
+
+        <!-- AUTO section -->
+        <div id="dcost-auto-section">
+          <div id="dcost-auto-display" style="background:linear-gradient(135deg,#FFF7ED,#FEF3C7);border:1px solid #FDBA74;border-radius:10px;padding:14px 18px;font-size:13px;color:var(--navy);">
+            — รอข้อมูล (กรอก Demand kW รายวัน) —
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">⚙️ ระบบใช้ค่า kW สูงสุด On-Peak ของเดือน × อัตรา ฿/kW (จากการตั้งค่าด้านบน)</div>
+        </div>
+
+        <!-- MANUAL section -->
+        <div id="dcost-manual-section" style="display:none;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div class="input-unit" style="max-width:180px;">
+              <input type="number" id="f-demand-peak-kw" placeholder="4603" step="1"
+                oninput="calcManualDemandCost()"
+                style="font-weight:700;font-family:var(--font-mono);">
+              <div class="unit-suffix">kW</div>
+            </div>
+            <span style="color:var(--text-muted);font-weight:700;font-size:16px;">×</span>
+            <span id="dcost-rate-label" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--navy);background:var(--off-white);border:1.5px solid var(--border);border-radius:8px;padding:8px 14px;">285.05 ฿/kW</span>
+            <span style="color:var(--text-muted);font-weight:700;font-size:16px;">=</span>
+            <div style="background:linear-gradient(135deg,#FFF7ED,#FEF3C7);border:1px solid #FDBA74;border-radius:10px;padding:10px 18px;display:flex;align-items:baseline;gap:6px;">
+              <span id="dcost-manual-result" style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:#C2410C;">—</span>
+              <span style="font-size:13px;color:#C2410C;font-weight:600;">฿</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">กรอก Peak kW สูงสุด On-Peak ของเดือนนี้ — ระบบคำนวณเป็นบาทให้อัตโนมัติ</div>
+        </div>
+      </div>
+
+      <div class="divider" style="margin:0 0 24px 0;"></div>
+
+      <!-- ── ค่าพลังงานไฟฟ้า (AUTO only — TREND) ── -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+          <span style="background:var(--accent);color:#fff;font-size:10px;padding:2px 8px;border-radius:20px;letter-spacing:.5px;">ENERGY COST</span>
+          ค่าพลังงานไฟฟ้า (บาท) — คำนวณจาก TREND
+        </div>
+        <div id="ecost-display" style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border:1px solid #93C5FD;border-radius:10px;padding:14px 18px;font-size:13px;color:var(--navy);">
+          — รอข้อมูล (ต้องกรอกบิลค่าไฟอย่างน้อย 1 เดือน และมีข้อมูลรายวัน ≥ 4 วัน) —
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">⚙️ ค่าเฉลี่ยการใช้พลังงานต่อวัน × จำนวนวันในเดือน × ฿/kWh — เป็นค่าคาดการณ์สิ้นเดือน</div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="resetForm()">รีเซ็ต</button>
+      <button class="btn btn-primary" onclick="saveData()">💾 บันทึกและอัปเดต Dashboard</button>
+    </div>
+  </div>
+</div>
+
+<div class="save-toast" id="toast">✅ บันทึกข้อมูลเรียบร้อยแล้ว</div>
+
+<script>
+// ─── DATE ───
+function thaiDate(d) {
+  const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()+543}`;
+}
+const now = new Date();
+const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+const toISOLocal = d => d.toISOString().split('T')[0];
+document.getElementById('topbarDate').textContent = now.toLocaleDateString('th-TH',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+document.getElementById('f-date').value = toISOLocal(yesterday);
+document.getElementById('f-ac-date').value = toISOLocal(now);
+window.addEventListener('load', () => {
+  fetchWeatherYesterday();
+  fetchWeatherToday();
+  initRates();
+  // โหลดข้อมูลจาก Google Sheets (วันล่าสุดอัตโนมัติ)
+  if (API_URL && API_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+    loadFromSheets();
+  } else {
+    // ใช้ข้อมูล demo ถ้ายังไม่ได้ตั้งค่า API
+    monthlyData = [62200,61800,63100,62800,61500,67261,64500,63800,62100,61200,60800,59448,62300,63000,64100,65200,63800,62100,61800,60900,61200,62100,61938,62300,61500,63000,62800,61200,60500,59800,60100];
+    demandData  = [4200,4150,4300,4280,4100,4603,4420,4350,4200,4100,4050,4154,4230,4300,4410,4510,4380,4210,4180,4090,4120,4210,4310,4200,4100,4300,4280,4100,4020,3980,4050];
+  }
+});
+
+// ─── NAV ───
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'entry') initEntryForm();
+}
+
+// ─── CHART DATA ───
+// ═══════════════════════════════════════════════════════
+// API CONFIG — ใส่ URL Apps Script Web App ของคุณตรงนี้
+// ได้จากการ Deploy → Manage Deployments → Copy URL
+// ═══════════════════════════════════════════════════════
+const API_URL = 'https://script.google.com/macros/s/AKfycbzcPR43CQ-oVMiNmZ-w9IAMKw8PB6DJg2w27249FnzHC3J2SoqsA9upjR0En073zc-_ng/exec';
+
+// ─── DATA ARRAYS (จะถูกแทนที่ด้วยข้อมูลจาก Sheets) ──
+let monthlyData = Array(31).fill(null);
+let demandData  = Array(31).fill(null);
+let avg2566     = 4154;
+let dataLoaded  = false;
+
+// ─── LOAD FROM SHEETS ─────────────────────────────────
+// ใช้วันล่าสุดที่มีข้อมูลใน Sheets อัตโนมัติ ไม่มี nav
+let _currentYear  = new Date().getFullYear();
+let _currentMonth = new Date().getMonth() + 1;
+
+async function loadFromSheets(forceYear, forceMonth) {
+  showApiStatus('loading');
+  try {
+    let year, month, monthData;
+
+    if (forceYear && forceMonth) {
+      // เรียกจาก saveData หรือ date picker — ใช้ปี/เดือนที่ระบุ
+      year  = forceYear;
+      month = forceMonth;
+    } else {
+      // เปิดหน้าครั้งแรก — ใช้ lastSavedDate จาก localStorage
+      const saved = localStorage.getItem('lastSavedDate');
+      if (saved) {
+        const [sy, sm] = saved.split('-').map(Number);
+        year  = sy;
+        month = sm;
+      } else {
+        year  = new Date().getFullYear();
+        month = new Date().getMonth() + 1;
+      }
+    }
+
+    _currentYear  = year;
+    _currentMonth = month;
+
+    // อัปเดต date picker ให้ตรงกับเดือนที่กำลังดู
+    const dp = document.getElementById('dash-date-picker');
+    if (dp && !dp.value) {
+      // set เป็นวันสุดท้ายของเดือน (จะอัปเดตอีกทีหลังได้ข้อมูล)
+      dp.value = `${year}-${String(month).padStart(2,'0')}-01`;
+    }
+
+    const [monthRes, baselineRes] = await Promise.all([
+      fetch(`${API_URL}?action=getMonth&year=${year}&month=${month}`),
+      fetch(`${API_URL}?action=getBaseline`)
+    ]);
+
+    monthData = await monthRes.json();
+    const baselineData = await baselineRes.json();
+
+    // อัปเดต monthlyData และ demandData จาก Sheets
+    monthlyData = Array(31).fill(null);
+    demandData  = Array(31).fill(null);
+    if (monthData.rows && monthData.rows.length > 0) {
+      monthData.rows.forEach(row => {
+        const day = parseInt(row.date.split('-')[2]) - 1; // 0-indexed
+        if (row.kwh)        monthlyData[day] = parseFloat(row.kwh);
+        if (row.onpeak_kw)  demandData[day]  = parseFloat(row.onpeak_kw);
+      });
+    }
+
+    // อัปเดต baseline avg2566
+    if (baselineData.rows && month) {
+      const bl = baselineData.rows.find(r => parseInt(r.month) === month);
+      if (bl) avg2566 = parseFloat(bl.avg_kwh_per_day) || avg2566;
+    }
+
+    dataLoaded = true;
+    refreshCharts();
+
+    // ── อัปเดต KPI จากข้อมูลวันล่าสุดใน Sheets ──
+    if (monthData.rows && monthData.rows.length > 0) {
+      // เรียงวันที่ หาวันล่าสุด
+      const sorted = [...monthData.rows].sort((a,b) => b.date.localeCompare(a.date));
+      const latest = sorted[0];
+      const fmt = n => n ? Number(parseFloat(n).toFixed(0)).toLocaleString() : '—';
+
+      if (latest.kwh)
+        document.getElementById('kpi-daily').innerHTML = fmt(latest.kwh) + '<span class="kpi-unit">kWh</span>';
+      if (latest.onpeak_kw)
+        document.getElementById('kpi-demand').innerHTML = fmt(latest.onpeak_kw) + '<span class="kpi-unit" style="color:var(--gold);">kW</span>';
+
+      // Max/Min จาก monthlyData
+      const validKwh = monthData.rows.filter(r => r.kwh).map(r => ({ val: parseFloat(r.kwh), date: r.date }));
+      if (validKwh.length > 0) {
+        const maxR = validKwh.reduce((a,b) => a.val > b.val ? a : b);
+        const minR = validKwh.reduce((a,b) => a.val < b.val ? a : b);
+        document.getElementById('kpi-max').innerHTML = fmt(maxR.val) + '<span class="kpi-unit">kWh</span>';
+        document.getElementById('kpi-max-date').textContent = 'วันที่ ' + parseInt(maxR.date.split('-')[2]);
+        document.getElementById('kpi-min').innerHTML = fmt(minR.val) + '<span class="kpi-unit">kWh</span>';
+        document.getElementById('kpi-min-date').textContent = 'วันที่ ' + parseInt(minR.date.split('-')[2]);
+      }
+
+      if (latest.total_water_m3)
+        document.getElementById('kpi-water').textContent = fmt(latest.total_water_m3);
+
+      // วันที่ล่าสุด (แสดงวันที่ของ row ล่าสุด)
+      const d = new Date(latest.date);
+      document.getElementById('dashDate').textContent = d.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+    }
+
+    // Annual kWh
+    fetch(`${API_URL}?action=getAnnual&year=${_currentYear}`, { redirect: 'follow' })
+      .then(r => r.json())
+      .then(res => {
+        if (res.annual_kwh)
+          document.getElementById('kpi-annual').textContent = Number(res.annual_kwh).toLocaleString();
+      }).catch(() => {});
+
+    if (monthData.rows && monthData.rows.length > 0) {
+      showApiStatus('ok', `โหลดข้อมูลจาก Sheets แล้ว (${monthData.count || monthData.rows.length} วัน)`);
+    } else {
+      showApiStatus('err', 'ไม่มีข้อมูลในเดือนนี้ — ลองเลือกวันที่อื่น หรือกรอกข้อมูลในหน้า "กรอกข้อมูล" ก่อน');
+    }
+  } catch (err) {
+    showApiStatus('err', 'ไม่สามารถเชื่อมต่อ Sheets — แสดงข้อมูล Demo');
+    console.warn('Sheets API error:', err);
+    // fallback: ใช้ข้อมูล demo เดิม
+    monthlyData = [62200,61800,63100,62800,61500,67261,64500,63800,62100,61200,60800,59448,62300,63000,64100,65200,63800,62100,61800,60900,61200,62100,61938,62300,61500,63000,62800,61200,60500,59800,60100];
+    demandData  = [4200,4150,4300,4280,4100,4603,4420,4350,4200,4100,4050,4154,4230,4300,4410,4510,4380,4210,4180,4090,4120,4210,4310,4200,4100,4300,4280,4100,4020,3980,4050];
+    refreshCharts();
+  }
+}
+
+// ─── LOAD FROM DATE PICKER ──────────────────────────────
+function loadFromDatePicker() {
+  const dp = document.getElementById('dash-date-picker');
+  if (!dp || !dp.value) {
+    showApiStatus('err', 'กรุณาเลือกวันที่ก่อน');
+    return;
+  }
+  const [y, m] = dp.value.split('-').map(Number);
+  // บันทึกไว้ใน localStorage
+  localStorage.setItem('lastSavedDate', `${y}-${m}`);
+  loadFromSheets(y, m);
+}
+
+function showApiStatus(type, msg) {
+  const el = document.getElementById('api-status');
+  if (!el) return;
+  const styles = {
+    loading: 'background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;',
+    ok:      'background:#F0FDF4;border:1px solid #86EFAC;color:#14532D;',
+    err:     'background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;'
+  };
+  const icons = { loading: '⏳', ok: '✅', err: '⚠️' };
+  el.style.cssText = `${styles[type]}border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;`;
+  el.textContent = `${icons[type]} ${msg || (type === 'loading' ? 'กำลังโหลดข้อมูลจาก Google Sheets...' : '')}`;
+  el.style.display = 'block';
+}
+
+function refreshCharts() {
+  // อัปเดต chart data ใหม่
+  if (window._energyChart) {
+    const valid = monthlyData.filter(v => v !== null && v > 0);
+    const avg   = valid.length ? valid.reduce((a,b)=>a+b,0)/valid.length : null;
+    window._energyChart.data.datasets[0].data = monthlyData;
+    if (avg) window._energyChart.data.datasets[1].data = Array(31).fill(avg);
+    window._energyChart.update();
+  }
+  if (window._demandChart) {
+    window._demandChart.data.datasets[0].data = demandData;
+    window._demandChart.data.datasets[0].backgroundColor = demandData.map(
+      v => v === Math.max(...demandData.filter(x=>x)) ? '#F59E0B'
+         : v === Math.min(...demandData.filter(x=>x)) ? '#3B82F6'
+         : '#1E4A9C'
+    );
+    window._demandChart.data.datasets[1].data = Array(31).fill(avg2566);
+    window._demandChart.update();
+  }
+  recalcRates();
+}
+let demandChartInstance = null;
+
+// ─── CHARTS ───
+// Donut
+const donutCtx = document.getElementById('donutChart').getContext('2d');
+window._donutChart = new Chart(donutCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['จ-ศ','ส-อา','Event'],
+    datasets: [{
+      data: [0, 0, 0],
+      backgroundColor: ['#1E4A9C','#3B82F6','#F59E0B'],
+      borderWidth: 0,
+      hoverOffset: 6
+    }]
+  },
+  options: {
+    cutout: '65%',
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` } } }
+  }
+});
+
+// Energy monthly line
+const eCtx = document.getElementById('energyChart').getContext('2d');
+const labels31 = Array.from({length:31},(_,i)=>i+1);
+
+// Plugin: แสดงค่า kWh บนจุดสูงสุด
+const energyMaxLabelPlugin = {
+  id: 'energyMaxLabel',
+  afterDatasetsDraw(chart) {
+    const data = chart.data.datasets[0]?.data;
+    if (!data) return;
+    const maxVal = Math.max(...data.filter(v => v !== null));
+    const maxIdx = data.indexOf(maxVal);
+    const meta = chart.getDatasetMeta(0);
+    const pt = meta.data[maxIdx];
+    if (!pt) return;
+    const ctx2 = chart.ctx;
+    ctx2.save();
+    // วงกลมเน้นจุดสูงสุด
+    ctx2.beginPath();
+    ctx2.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+    ctx2.fillStyle = '#EF4444';
+    ctx2.fill();
+    ctx2.strokeStyle = '#fff';
+    ctx2.lineWidth = 2;
+    ctx2.stroke();
+    // กล่อง label
+    const label = maxVal.toLocaleString() + ' kWh';
+    ctx2.font = 'bold 11px IBM Plex Sans Thai, sans-serif';
+    const tw = ctx2.measureText(label).width;
+    const pad = 6, bh = 20, bw = tw + pad * 2;
+    let bx = pt.x - bw / 2;
+    let by = pt.y - bh - 10;
+    const area = chart.chartArea;
+    bx = Math.max(area.left, Math.min(bx, area.right - bw));
+    ctx2.fillStyle = '#EF4444';
+    ctx2.beginPath();
+    ctx2.roundRect(bx, by, bw, bh, 4);
+    ctx2.fill();
+    ctx2.fillStyle = '#fff';
+    ctx2.textAlign = 'left';
+    ctx2.textBaseline = 'middle';
+    ctx2.fillText(label, bx + pad, by + bh / 2);
+    ctx2.restore();
+  }
+};
+
+// Gradient fill
+function buildEnergyGradient(ctx, chartArea) {
+  const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+  g.addColorStop(0,   'rgba(30,74,156,0.35)');
+  g.addColorStop(0.6, 'rgba(30,74,156,0.10)');
+  g.addColorStop(1,   'rgba(30,74,156,0)');
+  return g;
+}
+let energyGradientCache = null;
+
+// คำนวณค่าเฉลี่ยต่อวันจาก monthlyData ที่มีข้อมูล (ไม่นับ null/0)
+const validMonthlyData = monthlyData.filter(v => v !== null && v > 0);
+const avgDailyEnergy = validMonthlyData.length > 0
+  ? validMonthlyData.reduce((a, b) => a + b, 0) / validMonthlyData.length
+  : null;
+
+window._energyChart = new Chart(eCtx, {
+  type: 'line',
+  plugins: [energyMaxLabelPlugin],
+  data: {
+    labels: labels31,
+    datasets: [
+      {
+        label: 'การใช้พลังงาน (kWh)',
+        data: monthlyData,
+        borderColor: '#1E4A9C',
+        backgroundColor(context) {
+          const { ctx: c, chartArea } = context.chart;
+          if (!chartArea) return 'rgba(30,74,156,0.1)';
+          if (!energyGradientCache) energyGradientCache = buildEnergyGradient(c, chartArea);
+          return energyGradientCache;
+        },
+        borderWidth: 2,
+        fill: true,
+        tension: .4,
+        pointRadius: monthlyData.map(v => v === Math.max(...monthlyData) ? 0 : 3),
+        pointBackgroundColor: '#1E4A9C',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1.5,
+        pointHoverRadius: 5
+      },
+      {
+        label: 'ค่าเฉลี่ยต่อวัน',
+        data: avgDailyEnergy !== null ? Array(31).fill(avgDailyEnergy) : [],
+        type: 'line',
+        borderColor: '#F59E0B',
+        borderDash: [6, 4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        tension: 0
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    layout: { padding: { top: 30 } },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toLocaleString()} kWh` } } },
+    scales: {
+      x: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 10 }, color: '#5A6E9A' } },
+      y: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 10 }, color: '#5A6E9A', callback: v => (v/1000).toFixed(0)+'k' }, min: 56000 }
+    }
+  }
+});
+
+// Demand kW
+const dCtx = document.getElementById('demandChart').getContext('2d');
+// ─── PLUGIN: label "มีการจัดงาน" on MAX+Event bars ───
+const eventMaxLabelPlugin = {
+  id: 'eventMaxLabel',
+  afterDatasetsDraw(chart) {
+    const maxVal = Math.max(...demandData);
+    const dataset = chart.data.datasets[0];
+    if (!dataset) return;
+
+    const ctx2 = chart.ctx;
+    const meta = chart.getDatasetMeta(0);
+
+    meta.data.forEach((bar, i) => {
+      const day = i + 1;
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const isEvent = eventDays.has(dateStr);
+      const isMax   = demandData[i] === maxVal;
+
+      if (isMax && isEvent) {
+        const x = bar.x;
+        const y = bar.y - 6;
+
+        ctx2.save();
+        ctx2.font = 'bold 9px IBM Plex Sans Thai, sans-serif';
+        ctx2.textAlign = 'center';
+        ctx2.textBaseline = 'bottom';
+
+        const text = 'มีการจัดงาน'; // มีการจัดงาน
+        const tw = ctx2.measureText(text).width;
+        const pad = 4;
+
+        // Background pill
+        ctx2.fillStyle = 'rgba(245,158,11,0.15)';
+        ctx2.beginPath();
+        const rr = 4;
+        const bx = x - tw/2 - pad, by = y - 13, bw = tw + pad*2, bh = 13;
+        ctx2.moveTo(bx + rr, by);
+        ctx2.lineTo(bx + bw - rr, by);
+        ctx2.arcTo(bx + bw, by, bx + bw, by + rr, rr);
+        ctx2.lineTo(bx + bw, by + bh - rr);
+        ctx2.arcTo(bx + bw, by + bh, bx + bw - rr, by + bh, rr);
+        ctx2.lineTo(bx + rr, by + bh);
+        ctx2.arcTo(bx, by + bh, bx, by + bh - rr, rr);
+        ctx2.lineTo(bx, by + rr);
+        ctx2.arcTo(bx, by, bx + rr, by, rr);
+        ctx2.closePath();
+        ctx2.fill();
+
+        // Border
+        ctx2.strokeStyle = '#F59E0B';
+        ctx2.lineWidth = 1;
+        ctx2.stroke();
+
+        // Text
+        ctx2.fillStyle = '#B45309';
+        ctx2.fillText(text, x, y);
+        ctx2.restore();
+      }
+    });
+  }
+};
+
+demandChartInstance = window._demandChart = new Chart(dCtx, {
+  type: 'bar',
+  data: {
+    labels: labels31,
+    datasets: [
+      {
+        label: 'ความต้องการ (kW)',
+        data: demandData,
+        backgroundColor: demandData.map(v => v === Math.max(...demandData) ? '#F59E0B' : (v === Math.min(...demandData) ? '#3B82F6' : '#1E4A9C')),
+        borderRadius: 4,
+        borderSkipped: false
+      },
+      {
+        label: 'เฉลี่ยปี 2566',
+        data: Array(31).fill(avg2566),
+        type: 'line',
+        borderColor: '#DC2626',
+        borderDash: [5,4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false }, eventMaxLabel: {} },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#5A6E9A' } },
+      y: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 10 }, color: '#5A6E9A' }, min: 3800 }
+    }
+  },
+  plugins: [eventMaxLabelPlugin]
+});
+
+// ─── SAVE & UPDATE ───
+function fmt(n) { return Number(n).toLocaleString(); }
+
+function saveData() {
+  // Read form
+  const daily = document.getElementById('f-daily').value;
+  const demand = document.getElementById('f-demand').value;
+  const maxE = document.getElementById('f-max').value;
+  const minE = document.getElementById('f-min').value;
+  const onpeak = document.getElementById('f-onpeak').value;
+  const offpeak = document.getElementById('f-offpeak').value;
+  const partial = document.getElementById('f-partial').value;
+  const annual = document.getElementById('f-annual').value;
+  const chillerPct = document.getElementById('f-chiller-pct').value;
+  const mallPct = 100 - Number(chillerPct);
+  const compare = document.getElementById('f-compare').value;
+  const tempAvg = document.getElementById('f-temp-avg').value;
+  const tempMax = document.getElementById('f-temp-max').value;
+  const tempInDay = document.getElementById('f-temp-in-day').value;
+  const tempInNight = document.getElementById('f-temp-in-night').value;
+  const humOut = document.getElementById('f-humidity-out').value;
+  const humIn = document.getElementById('f-humidity-in').value;
+  const acTon = document.getElementById('f-ac-ton').value;
+  const acTempMax = document.getElementById('f-ac-temp-max').value;
+  const acRH = document.getElementById('f-ac-rh').value;
+  const water = document.getElementById('f-water').value;
+  const acDateRaw = document.getElementById('f-ac-date').value;
+  const dateRaw = document.getElementById('f-date').value;
+  const eventDaysVal = document.getElementById('f-event-days').value; // "2024-10-05,2024-10-12,..."
+
+  // ── Compute costs from Section 5 (not raw inputs) ──
+  const rateKw = parseFloat(document.getElementById('f-rate-kw').value) || 285.05;
+  const today2 = new Date();
+  const day2 = today2.getDate();
+  const daysInMonth2 = new Date(today2.getFullYear(), today2.getMonth()+1, 0).getDate();
+  const maxDemandNow = Math.max(...demandData.slice(0, day2));
+
+  // Demand cost
+  let costDemand = null;
+  if (demandCostMode === 'auto') {
+    costDemand = maxDemandNow * rateKw;
+  } else {
+    const pkKw = parseFloat(document.getElementById('f-demand-peak-kw')?.value);
+    costDemand = (!isNaN(pkKw) && pkKw > 0) ? pkKw * rateKw : null;
+  }
+
+  // Energy cost (ค่าเฉลี่ยต่อวัน × จำนวนวันในเดือน)
+  const savedBills = JSON.parse(localStorage.getItem(RATE_STORAGE_KEY) || '{}');
+  let tKwh2 = 0, tBaht2 = 0, cnt2 = 0;
+  Object.values(savedBills).forEach(s => {
+    if (s.kwh && s.baht && parseFloat(s.kwh) > 0) { tKwh2 += parseFloat(s.kwh); tBaht2 += parseFloat(s.baht); cnt2++; }
+  });
+  const avgR2 = cnt2 > 0 ? tBaht2 / tKwh2 : null;
+  let effR2 = kwhMode === 'auto' ? avgR2 : (parseFloat(document.getElementById('f-rate-kwh-manual')?.value) || null);
+  const dp2 = monthlyData.slice(0, day2).filter(v => v !== null && v > 0);
+  const fKwh2 = dp2.length >= 1
+    ? (dp2.reduce((a, b) => a + b, 0) / dp2.length) * daysInMonth2
+    : null;
+  let costEnergy = (fKwh2 && effR2) ? fKwh2 * effR2 : null;
+
+  // Update KPIs
+  document.getElementById('kpi-daily').innerHTML = fmt(daily) + '<span class="kpi-unit">kWh</span>';
+  document.getElementById('kpi-demand').innerHTML = fmt(demand) + '<span class="kpi-unit">kW</span>';
+  document.getElementById('kpi-max').innerHTML = fmt(maxE) + '<span class="kpi-unit">kWh</span>';
+  document.getElementById('kpi-min').innerHTML = fmt(minE) + '<span class="kpi-unit">kWh</span>';
+  document.getElementById('kpi-annual').textContent = fmt(annual);
+  document.getElementById('kpi-water').textContent = fmt(water);
+  document.getElementById('kpi-compare').textContent = (compare >= 0 ? '+' : '') + compare + '%';
+  document.getElementById('kpi-compare').style.cssText = compare >= 0
+    ? 'background:rgba(16,185,129,.2);color:#6EE7B7;'
+    : 'background:rgba(239,68,68,.2);color:#FCA5A5;';
+
+  // Bands
+  document.getElementById('band-onpeak').textContent = fmt(onpeak);
+  document.getElementById('band-offpeak').textContent = fmt(offpeak);
+  document.getElementById('band-partial').textContent = fmt(partial);
+
+  // Proportions
+  document.getElementById('pct-chiller').textContent = chillerPct + '%';
+  document.getElementById('pct-mall').textContent = mallPct + '%';
+  document.querySelector('.prog-row:first-child .prog-fill').style.width = chillerPct + '%';
+  document.querySelector('.prog-row:last-child .prog-fill').style.width = mallPct + '%';
+
+  // Donut: คำนวณ % วันประเภทต่างๆ จาก eventDays ในเดือนนั้น
+  if (dateRaw) {
+    const [yr, mo] = dateRaw.split('-').map(Number);
+    const daysInMo = new Date(yr, mo, 0).getDate();
+    let wdCount = 0, weCount = 0, evCount = 0;
+    for (let d = 1; d <= daysInMo; d++) {
+      const dStr = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow = new Date(dStr).getDay(); // 0=Sun,6=Sat
+      if (eventDays.has(dStr)) evCount++;
+      else if (dow === 0 || dow === 6) weCount++;
+      else wdCount++;
+    }
+    const wdPct = Math.round(wdCount/daysInMo*100);
+    const wePct = Math.round(weCount/daysInMo*100);
+    const evPct = 100 - wdPct - wePct;
+    if (window._donutChart) {
+      window._donutChart.data.datasets[0].data = [wdPct, wePct, evPct];
+      window._donutChart.update();
+    }
+    document.querySelector('.donut-big').textContent = '100%';
+    const lwd = document.getElementById('legend-wd');
+    const lwe = document.getElementById('legend-we');
+    const lev = document.getElementById('legend-ev');
+    if (lwd) lwd.textContent = wdPct + '%';
+    if (lwe) lwe.textContent = wePct + '%';
+    if (lev) lev.textContent = evPct + '%';
+  }
+
+  // Temp
+  document.getElementById('temp-avg').textContent = tempAvg + '°C';
+  document.getElementById('temp-max').textContent = tempMax + '°C';
+  document.getElementById('temp-in-day').textContent = tempInDay + '°C';
+  document.getElementById('temp-in-night').textContent = tempInNight + '°C';
+  document.getElementById('humidity-out').textContent = humOut + '%';
+  document.getElementById('humidity-in').textContent = humIn + '%';
+
+  // AC
+  document.getElementById('ac-ton').textContent = fmt(acTon);
+  document.getElementById('ac-temp').textContent = (acTempMax || '--') + '°C';
+  document.getElementById('ac-rh').textContent = (acRH || '--') + '%RH';
+  if (acDateRaw) {
+    const d = new Date(acDateRaw);
+    document.getElementById('ac-date').textContent = thaiDate(d);
+  }
+
+  // Costs
+  document.getElementById('cost-demand').textContent = costDemand !== null ? fmt(costDemand.toFixed(0)) : '—';
+  document.getElementById('cost-energy').textContent = costEnergy !== null ? fmt(costEnergy.toFixed(0)) : '—';
+
+  // Date header
+  if (dateRaw) {
+    const d = new Date(dateRaw);
+    document.getElementById('dashDate').textContent = thaiDate(d);
+    // จำปี/เดือนล่าสุดที่บันทึกเสมอ (ใช้ตอนโหลด Dashboard ครั้งถัดไป)
+    const [sy, sm] = dateRaw.split('-').map(Number);
+    localStorage.setItem('lastSavedDate', `${sy}-${sm}`);
+    _currentYear = sy; _currentMonth = sm;
+  }
+
+  // Update demand chart event colors
+  updateDemandChart();
+
+  // ── POST ไป Google Sheets ──
+  if (API_URL && API_URL !== 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+    const payload = {
+      action: 'upsertDay',   // update ถ้ามีวันนั้นแล้ว, insert ถ้ายังไม่มี
+      data: {
+        date:           dateRaw,
+        kwh:            daily,
+        onpeak_kw:      demand,
+        offpeak_kw:     offpeak,
+        partial_kw:     partial,
+        temp_out_day:   tempAvg,
+        temp_out_night: tempInNight,
+        temp_out_max:   tempMax,
+        temp_in_day:    tempInDay,
+        temp_in_night:  tempInNight,
+        rh_out_day:     humOut,
+        rh_in_day:      humIn,
+        total_water_m3: water
+      }
+    };
+    fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }).then(r => r.json())
+      .then(res => {
+        showApiStatus('ok', `บันทึก ${dateRaw} ลง Sheets แล้ว (${res.status})`);
+        // จำวันที่ล่าสุดที่บันทึก เพื่อใช้ตอน reload หน้า Dashboard
+        const [sy, sm] = dateRaw.split('-').map(Number);
+        localStorage.setItem('lastSavedDate', `${sy}-${sm}`);
+        _currentYear = sy; _currentMonth = sm;
+        loadFromSheets(sy, sm);
+      })
+      .catch(err => showApiStatus('err', 'บันทึกลง Sheets ไม่สำเร็จ: ' + err.message));
+  }
+
+  // Toast
+  const toast = document.getElementById('toast');
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 2800);
+
+  // Switch to dashboard
+  setTimeout(() => {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('page-dashboard').classList.add('active');
+    document.querySelector('.nav-btn:first-child').classList.add('active');
+  }, 800);
+}
+
+// ─── CALENDAR TOGGLE ───
+let calInitialized = false;
+function toggleCalendar() {
+  const body = document.getElementById('cal-body');
+  const icon = document.getElementById('cal-toggle-icon');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  icon.style.transform = open ? 'rotate(0deg)' : 'rotate(-90deg)';
+  if (open && !calInitialized) {
+    calInitialized = true;
+    initCalendar();
+  }
+}
+
+// ─── EVENT CALENDAR ───
+let eventDays = new Set(); // stores "YYYY-MM-DD" strings
+let calYear, calMonth;
+
+function initCalendar() {
+  const ref = new Date();
+  calYear = ref.getFullYear();
+  calMonth = ref.getMonth(); // 0-indexed
+  renderCalendar();
+}
+
+function changeCalMonth(delta) {
+  calMonth += delta;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const thMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  document.getElementById('cal-month-label').textContent = `${thMonths[calMonth]} ${calYear + 543}`;
+
+  const grid = document.getElementById('event-calendar');
+  grid.innerHTML = '';
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const todayStr = toISOLocal(new Date());
+
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = new Date(calYear, calMonth, d).getDay(); // 0=Sun,6=Sat
+    const isWeekend = dow === 0 || dow === 6;
+
+    const el = document.createElement('div');
+    el.textContent = d;
+    el.className = 'cal-day' +
+      (eventDays.has(dateStr) ? ' event' : '') +
+      (dateStr === todayStr ? ' today' : '') +
+      (isWeekend ? ' weekend' : '');
+    el.title = dateStr;
+    el.onclick = () => toggleEventDay(dateStr, el);
+    grid.appendChild(el);
+  }
+
+  // Refresh summary & badge for the newly-viewed month
+  updateEventSummary();
+}
+
+function toggleEventDay(dateStr, el) {
+  if (eventDays.has(dateStr)) {
+    eventDays.delete(dateStr);
+    el.classList.remove('event');
+  } else {
+    eventDays.add(dateStr);
+    el.classList.add('event');
+  }
+  updateEventSummary();
+  updateDemandChart();
+}
+
+function updateEventSummary() {
+  const summaryEl = document.getElementById('event-summary');
+  const badge = document.getElementById('cal-event-badge');
+  const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+  // Filter to only days in the currently-viewed month
+  const monthPrefix = `${calYear}-${String(calMonth+1).padStart(2,'0')}-`;
+  const sortedAll = [...eventDays].sort();
+  const sortedThisMonth = sortedAll.filter(s => s.startsWith(monthPrefix));
+
+  // Badge: show count for current month only
+  if (sortedThisMonth.length > 0) {
+    badge.textContent = `🎪 ${sortedThisMonth.length} วัน`;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+
+  // Summary box: show only this month's event days
+  if (sortedThisMonth.length === 0) {
+    summaryEl.innerHTML = '<span style="color:var(--text-muted)">ยังไม่ได้เลือกวันมีงานในเดือนนี้</span>';
+  } else {
+    const labels = sortedThisMonth.map(s => {
+      const d = new Date(s);
+      return `<span style="background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;font-weight:700;padding:2px 8px;border-radius:20px;font-size:11px;">${d.getDate()} ${thMonths[d.getMonth()]}</span>`;
+    }).join(' ');
+    summaryEl.innerHTML = `<span style="font-weight:600;color:var(--navy);">🎪 วันที่มีงาน Event (${sortedThisMonth.length} วัน):</span><br><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">${labels}</div>`;
+  }
+
+  // Hidden field: store ALL selected days (all months) for Google Sheets
+  document.getElementById('f-event-days').value = sortedAll.join(',');
+}
+
+// ─── UPDATE DEMAND CHART COLORS based on eventDays ───
+function updateDemandChart() {
+  if (!demandChartInstance) return;
+  const maxVal = Math.max(...demandData);
+  const minVal = Math.min(...demandData);
+  const newColors = demandData.map((v, i) => {
+    const day = i + 1;
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isEvent = eventDays.has(dateStr);
+    if (v === maxVal) return '#EF4444'; // MAX always red (even if also Event)
+    if (isEvent)      return '#F59E0B'; // Event = orange
+    if (v === minVal) return '#3B82F6'; // Min = blue
+    return '#1E4A9C'; // Default navy
+  });
+  demandChartInstance.data.datasets[0].backgroundColor = newColors;
+  demandChartInstance.update();
+}
+
+
+// ─── RATE SETTINGS (localStorage) ───────────────────────────────────────────
+const RATE_STORAGE_KEY    = 'iw_rates_v1';
+const RATE_KW_KEY         = 'iw_rate_kw_v1';
+const RATE_MODE_KEY       = 'iw_rate_mode_v1';
+const DEMAND_COST_MODE_KEY = 'iw_dcost_mode_v1';
+
+let demandCostMode = 'auto';
+
+// Load saved kW rate
+function loadRateKw() {
+  const saved = localStorage.getItem(RATE_KW_KEY);
+  if (saved) document.getElementById('f-rate-kw').value = saved;
+}
+
+function toggleEditKw() {
+  const inp = document.getElementById('f-rate-kw');
+  const btnEdit = document.getElementById('btn-edit-kw');
+  const btnSave = document.getElementById('btn-save-kw');
+  inp.disabled = false;
+  inp.style.background = '#fff';
+  inp.focus();
+  btnEdit.style.display = 'none';
+  btnSave.style.display = 'inline-flex';
+}
+
+function saveKw() {
+  const inp = document.getElementById('f-rate-kw');
+  const btnEdit = document.getElementById('btn-edit-kw');
+  const btnSave = document.getElementById('btn-save-kw');
+  localStorage.setItem(RATE_KW_KEY, inp.value);
+  inp.disabled = true;
+  inp.style.background = '#F0F4FF';
+  btnEdit.style.display = 'inline-flex';
+  btnSave.style.display = 'none';
+  recalcRates();
+}
+
+// ── kWh mode toggle ──
+let kwhMode = 'auto';
+function setKwhMode(mode) {
+  kwhMode = mode;
+  localStorage.setItem(RATE_MODE_KEY, mode);
+  document.getElementById('rate-auto-section').style.display   = mode === 'auto'   ? 'block' : 'none';
+  document.getElementById('rate-manual-section').style.display = mode === 'manual' ? 'block' : 'none';
+  const btnA = document.getElementById('btn-mode-auto');
+  const btnM = document.getElementById('btn-mode-manual');
+  if (mode === 'auto') {
+    btnA.style.background = 'var(--accent)'; btnA.style.color = '#fff'; btnA.style.borderColor = 'var(--accent)';
+    btnM.style.background = 'var(--off-white)'; btnM.style.color = 'var(--navy)'; btnM.style.borderColor = 'var(--border)';
+  } else {
+    btnM.style.background = 'var(--accent)'; btnM.style.color = '#fff'; btnM.style.borderColor = 'var(--accent)';
+    btnA.style.background = 'var(--off-white)'; btnA.style.color = 'var(--navy)'; btnA.style.borderColor = 'var(--border)';
+  }
+  recalcRates();
+}
+
+// ── Demand Cost mode toggle ──
+function setDemandCostMode(mode) {
+  demandCostMode = mode;
+  localStorage.setItem(DEMAND_COST_MODE_KEY, mode);
+  document.getElementById('dcost-auto-section').style.display   = mode === 'auto'   ? 'block' : 'none';
+  document.getElementById('dcost-manual-section').style.display = mode === 'manual' ? 'block' : 'none';
+  const btnA = document.getElementById('btn-dcost-auto');
+  const btnM = document.getElementById('btn-dcost-manual');
+  if (mode === 'auto') {
+    btnA.style.background = 'var(--accent)'; btnA.style.color = '#fff'; btnA.style.borderColor = 'var(--accent)';
+    btnM.style.background = 'var(--off-white)'; btnM.style.color = 'var(--navy)'; btnM.style.borderColor = 'var(--border)';
+  } else {
+    btnM.style.background = '#DC2626'; btnM.style.color = '#fff'; btnM.style.borderColor = '#DC2626';
+    btnA.style.background = 'var(--off-white)'; btnA.style.color = 'var(--navy)'; btnA.style.borderColor = 'var(--border)';
+  }
+  recalcRates();
+}
+
+function calcManualDemandCost() {
+  const rateKw = parseFloat(document.getElementById('f-rate-kw').value) || 285.05;
+  const kw = parseFloat(document.getElementById('f-demand-peak-kw').value);
+  const resultEl = document.getElementById('dcost-manual-result');
+  if (!isNaN(kw) && kw > 0) {
+    resultEl.textContent = Number((kw * rateKw).toFixed(0)).toLocaleString();
+  } else {
+    resultEl.textContent = '—';
+  }
+}
+
+// ── Build 6-row table (auto-shift by current month) ──
+function buildRateTable() {
+  const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const saved = JSON.parse(localStorage.getItem(RATE_STORAGE_KEY) || '{}');
+  const tbody = document.getElementById('rate-tbody');
+  tbody.innerHTML = '';
+
+  // Generate 6 month keys ending at prev month (current month bill not yet received)
+  const today = new Date();
+  // Rows: 6 months back from (today - 1 month), i.e. months [-7..-2] relative to today
+  const rows = [];
+  for (let i = 7; i >= 2; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    rows.push({ y: d.getFullYear(), m: d.getMonth(), key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` });
+  }
+  // Also add previous month and current month as "pending" rows
+  for (let i = 1; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    rows.push({ y: d.getFullYear(), m: d.getMonth(), key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, pending: true });
+  }
+  // Show only 6 rows: last 6 (includes up to 2 pending at bottom)
+  // Actually show: 4 filled + 2 pending = 6 total
+  // Recalculate: we want 6 rows where bottom 1-2 are pending (no bill yet)
+  // rows currently has 8 entries; take last 6
+  const display = rows.slice(-6);
+
+  display.forEach(({ y, m, key, pending }) => {
+    const s = saved[key] || {};
+    const kwh  = s.kwh  || '';
+    const baht = s.baht || '';
+    const rate = (kwh && baht) ? (parseFloat(baht) / parseFloat(kwh)).toFixed(4) : '';
+    const isPending = pending || false;
+
+    const beYear = y + 543;
+    const label = `${thMonths[m]} ${beYear}`;
+
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border)';
+    if (isPending) tr.style.background = '#FFFBEB';
+
+    tr.innerHTML = `
+      <td style="padding:10px 12px;font-weight:600;color:${isPending ? '#D97706' : 'var(--navy)'};">
+        ${label}${isPending ? ' <span style="font-size:10px;color:#D97706;font-weight:700;">(รอบิล)</span>' : ''}
+      </td>
+      <td style="padding:6px 12px;text-align:right;">
+        <input type="number" data-key="${key}" data-field="kwh"
+          placeholder="${isPending ? '—' : 'กรอก kWh'}"
+          ${isPending ? 'disabled' : ''}
+          onchange="saveRateRow('${key}','kwh',this.value)"
+          style="width:120px;text-align:right;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-family:var(--font-mono);font-size:13px;background:${isPending ? '#FEF3C7' : 'var(--off-white)'};">
+      </td>
+      <td style="padding:6px 12px;text-align:right;">
+        <input type="number" data-key="${key}" data-field="baht"
+          placeholder="${isPending ? '—' : 'กรอก ฿'}"
+          ${isPending ? 'disabled' : ''}
+          onchange="saveRateRow('${key}','baht',this.value)"
+          style="width:140px;text-align:right;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-family:var(--font-mono);font-size:13px;background:${isPending ? '#FEF3C7' : 'var(--off-white)'};">
+      </td>
+      <td style="padding:10px 12px;text-align:right;font-family:var(--font-mono);font-weight:700;color:${rate ? 'var(--accent)' : 'var(--text-muted)'};">
+        ${rate ? rate : '—'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  recalcRates();
+}
+
+function saveRateRow(key, field, value) {
+  const saved = JSON.parse(localStorage.getItem(RATE_STORAGE_KEY) || '{}');
+  if (!saved[key]) saved[key] = {};
+  saved[key][field] = value;
+  localStorage.setItem(RATE_STORAGE_KEY, JSON.stringify(saved));
+  buildRateTable(); // rebuild to refresh rate column
+}
+
+function recalcRates() {
+  const saved = JSON.parse(localStorage.getItem(RATE_STORAGE_KEY) || '{}');
+  const rateKw = parseFloat(document.getElementById('f-rate-kw').value) || 285.05;
+
+  // Sum all months that have both kwh and baht
+  let totalKwh = 0, totalBaht = 0, count = 0;
+  Object.values(saved).forEach(s => {
+    if (s.kwh && s.baht && parseFloat(s.kwh) > 0) {
+      totalKwh  += parseFloat(s.kwh);
+      totalBaht += parseFloat(s.baht);
+      count++;
+    }
+  });
+
+  const avgRate = count > 0 ? totalBaht / totalKwh : null;
+
+  // Update footer
+  document.getElementById('rate-total-kwh').textContent  = count > 0 ? Number(totalKwh.toFixed(0)).toLocaleString()  : '—';
+  document.getElementById('rate-total-baht').textContent = count > 0 ? Number(totalBaht.toFixed(0)).toLocaleString() : '—';
+  document.getElementById('rate-avg-kwh').textContent    = avgRate ? avgRate.toFixed(4) + ' ฿/kWh' : '—';
+
+  // คำนวณ forecastKwh = ค่าเฉลี่ยต่อวัน × จำนวนวันในเดือน
+  const today = new Date();
+  const dayOfMonth = today.getDate();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+  const dataPoints = monthlyData.slice(0, dayOfMonth).filter(v => v !== null && v > 0);
+  const n = dataPoints.length;
+
+  let forecastKwh = null;
+  if (n >= 1) {
+    const avgPerDay = dataPoints.reduce((a, b) => a + b, 0) / n;
+    forecastKwh = avgPerDay * daysInMonth;
+  }
+
+  // Determine effective บาท/kWh
+  let effectiveRate = null;
+  if (kwhMode === 'auto') {
+    effectiveRate = avgRate;
+  } else {
+    const manual = parseFloat(document.getElementById('f-rate-kwh-manual')?.value);
+    effectiveRate = isNaN(manual) ? null : manual;
+  }
+
+  // Max demand from demandData
+  const maxDemand = Math.max(...demandData.slice(0, dayOfMonth));
+  const autoDemandCost = maxDemand * rateKw;
+
+  // ── Result box (in Rate Settings section) ──
+  const box = document.getElementById('rate-result-box');
+  if (dayOfMonth <= 3) {
+    box.style.background = '#FEF3C7';
+    box.style.border = '1px solid #FCD34D';
+    box.innerHTML = `<span style="font-size:20px;">⏳</span> <span style="font-weight:700;color:#92400E;">อยู่ระหว่างการคำนวณ</span><br>
+      <span style="font-size:12px;color:#B45309;">ข้อมูลยังน้อยเกินไป (${dayOfMonth} วันแรกของเดือน) — จะแสดงผลตั้งแต่วันที่ 4 เป็นต้นไป</span>`;
+  } else if (!effectiveRate) {
+    box.style.background = 'var(--off-white)';
+    box.style.border = '1px solid var(--border)';
+    box.innerHTML = `<span style="color:var(--text-muted);font-size:13px;">กรุณากรอกข้อมูลบิลค่าไฟอย่างน้อย 1 เดือน เพื่อให้ระบบคำนวณ บาท/kWh</span>`;
+  } else if (!forecastKwh) {
+    box.style.background = 'var(--off-white)';
+    box.style.border = '1px solid var(--border)';
+    box.innerHTML = `<span style="color:var(--text-muted);font-size:13px;">ไม่มีข้อมูล kWh รายวันเพียงพอสำหรับคำนวณ TREND</span>`;
+  } else {
+    const forecastEnergy = forecastKwh * effectiveRate;
+    box.style.background = 'linear-gradient(135deg,#EFF6FF,#DBEAFE)';
+    box.style.border = '1px solid #93C5FD';
+    box.innerHTML = `
+      <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:10px;">📊 ประมาณการค่าใช้จ่ายสิ้นเดือน (TREND)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="background:#fff;border-radius:8px;padding:12px 14px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">ค่าพลังงานไฟฟ้า</div>
+          <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--accent);">${Number(forecastEnergy.toFixed(0)).toLocaleString()}</div>
+          <div style="font-size:11px;color:var(--text-muted);">฿ · เฉลี่ย ${Number(forecastKwh.toFixed(0)).toLocaleString()} kWh × ${effectiveRate.toFixed(4)} ฿/kWh</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:12px 14px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">ค่าความต้องการ On-Peak</div>
+          <div style="font-family:var(--font-mono);font-size:22px;font-weight:700;color:#DC2626;">${Number(autoDemandCost.toFixed(0)).toLocaleString()}</div>
+          <div style="font-size:11px;color:var(--text-muted);">฿ · Peak ${Number(maxDemand.toFixed(0)).toLocaleString()} kW × ${rateKw} ฿/kW</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#5A6E9A;margin-top:8px;">ณ วันที่ ${dayOfMonth} / ${daysInMonth} ของเดือน · บาท/kWh = ${effectiveRate.toFixed(4)}</div>
+    `;
+  }
+
+  // ── Update Section 5: ค่าความต้องการ On-Peak (AUTO display) ──
+  const dcostAutoEl = document.getElementById('dcost-auto-display');
+  if (dcostAutoEl) {
+    dcostAutoEl.innerHTML = `
+      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+        <span style="font-family:var(--font-mono);font-size:26px;font-weight:700;color:#C2410C;">${Number(autoDemandCost.toFixed(0)).toLocaleString()}</span>
+        <span style="font-size:14px;font-weight:600;color:#C2410C;">฿</span>
+        <span style="font-size:12px;color:var(--text-muted);margin-left:4px;">· Peak ${Number(maxDemand.toFixed(0)).toLocaleString()} kW × ${rateKw.toLocaleString()} ฿/kW</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">ข้อมูล ณ วันที่ ${dayOfMonth} / ${daysInMonth} ของเดือน — ค่า kW สูงสุด On-Peak จากข้อมูลรายวัน</div>
+    `;
+  }
+
+  // ── Update rate label in manual demand cost ──
+  const rateLabel = document.getElementById('dcost-rate-label');
+  if (rateLabel) rateLabel.textContent = rateKw.toLocaleString() + ' ฿/kW';
+  calcManualDemandCost();
+
+  // ── Update Section 5: ค่าพลังงานไฟฟ้า (always TREND) ──
+  const ecostEl = document.getElementById('ecost-display');
+  if (ecostEl) {
+    if (dayOfMonth <= 3) {
+      ecostEl.style.background = '#FEF3C7';
+      ecostEl.style.border = '1px solid #FCD34D';
+      ecostEl.innerHTML = `<span style="font-weight:700;color:#92400E;">⏳ ข้อมูลยังน้อยเกินไป</span> — จะแสดงผลตั้งแต่วันที่ 4 เป็นต้นไป`;
+    } else if (!effectiveRate) {
+      ecostEl.style.background = 'var(--off-white)';
+      ecostEl.style.border = '1px solid var(--border)';
+      ecostEl.innerHTML = `<span style="color:var(--text-muted);">กรุณากรอกข้อมูลบิลค่าไฟอย่างน้อย 1 เดือน (ส่วนการตั้งค่าอัตราด้านบน)</span>`;
+    } else if (!forecastKwh) {
+      ecostEl.style.background = 'var(--off-white)';
+      ecostEl.style.border = '1px solid var(--border)';
+      ecostEl.innerHTML = `<span style="color:var(--text-muted);">ไม่มีข้อมูล kWh รายวันเพียงพอสำหรับคำนวณ TREND</span>`;
+    } else {
+      const forecastEnergy = forecastKwh * effectiveRate;
+      ecostEl.style.background = 'linear-gradient(135deg,#EFF6FF,#DBEAFE)';
+      ecostEl.style.border = '1px solid #93C5FD';
+      ecostEl.innerHTML = `
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+          <span style="font-family:var(--font-mono);font-size:26px;font-weight:700;color:var(--accent);">${Number(forecastEnergy.toFixed(0)).toLocaleString()}</span>
+          <span style="font-size:14px;font-weight:600;color:var(--accent);">฿</span>
+          <span style="font-size:12px;color:var(--text-muted);margin-left:4px;">· เฉลี่ย ${Number(forecastKwh.toFixed(0)).toLocaleString()} kWh × ${effectiveRate.toFixed(4)} ฿/kWh</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">ณ วันที่ ${dayOfMonth} / ${daysInMonth} ของเดือน</div>
+      `;
+      // Push to dashboard cost-energy card live
+      document.getElementById('cost-energy').textContent = Number(forecastEnergy.toFixed(0)).toLocaleString();
+    }
+  }
+
+  // Push demand cost to dashboard live (from whichever mode is active)
+  const liveDemandCost = getDemandCostValue(autoDemandCost, rateKw);
+  if (liveDemandCost !== null) {
+    document.getElementById('cost-demand').textContent = Number(liveDemandCost.toFixed(0)).toLocaleString();
+  }
+}
+
+// Helper: get the current demand cost based on active mode
+function getDemandCostValue(autoDemandCost, rateKw) {
+  if (demandCostMode === 'auto') {
+    return autoDemandCost;
+  } else {
+    const kw = parseFloat(document.getElementById('f-demand-peak-kw')?.value);
+    return (!isNaN(kw) && kw > 0) ? kw * rateKw : null;
+  }
+}
+
+function initRates() {
+  loadRateKw();
+  const savedMode = localStorage.getItem(RATE_MODE_KEY) || 'auto';
+  setKwhMode(savedMode);
+  const savedDcostMode = localStorage.getItem(DEMAND_COST_MODE_KEY) || 'auto';
+  setDemandCostMode(savedDcostMode);
+  buildRateTable();
+  // listen for manual rate changes
+  const manualInp = document.getElementById('f-rate-kwh-manual');
+  if (manualInp) manualInp.addEventListener('input', recalcRates);
+}
+
+// Init calendar lazily (opened on demand)
+// initCalendar(); // removed – now called inside toggleCalendar on first open
+
+// ─── SNAPSHOT ───
+async function saveSnapshot() {
+  const btn = document.getElementById('btn-snapshot');
+  const original = btn.innerHTML;
+
+  // ต้องอยู่หน้า Dashboard ก่อน
+  const dash = document.getElementById('page-dashboard');
+  if (!dash.classList.contains('active')) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    dash.classList.add('active');
+    document.querySelector('.nav-btn:first-child').classList.add('active');
+    await new Promise(r => setTimeout(r, 300)); // รอ render
+  }
+
+  btn.innerHTML = '⏳ กำลังจับภาพ...';
+  btn.disabled = true;
+
+  // ซ่อน topbar ออกก่อนถ่าย
+  const topbar = document.querySelector('.topbar');
+  topbar.style.display = 'none';
+
+  // ตั้ง scroll ให้อยู่บนสุด
+  window.scrollTo(0, 0);
+  await new Promise(r => setTimeout(r, 100));
+
+  try {
+    const canvas = await html2canvas(dash, {
+      backgroundColor: '#F0F4FF',
+      scale: 2,           // Retina quality
+      useCORS: true,
+      scrollY: 0,
+      windowWidth: document.documentElement.scrollWidth,
+      windowHeight: dash.scrollHeight,
+      ignoreElements: el => el.id === 'btn-snapshot'
+    });
+
+    // ชื่อไฟล์: IW_YYYY-MM-DD
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const filename = `IW_Energy_${stamp}.png`;
+
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+
+    btn.innerHTML = '✅ บันทึกแล้ว!';
+    setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 2000);
+  } catch(e) {
+    btn.innerHTML = '❌ ไม่สำเร็จ';
+    setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 2000);
+    console.error(e);
+  } finally {
+    topbar.style.display = '';
+  }
+}
+
+// ─── DATE ↔ MONTH SYNC ────────────────────────────────────────
+let monthManualOverride = false;
+
+function syncMonthFromDate() {
+  const dateVal = document.getElementById('f-date').value;
+  if (!dateVal || monthManualOverride) return;
+  const month = parseInt(dateVal.split('-')[1]); // 1-12
+  document.getElementById('f-month').value = month;
+}
+
+function onMonthManualChange() {
+  const dateVal = document.getElementById('f-date').value;
+  if (!dateVal) return;
+  const dateMonth = parseInt(dateVal.split('-')[1]);
+  const selMonth  = parseInt(document.getElementById('f-month').value);
+  const badge = document.getElementById('month-lock-badge');
+  if (selMonth !== dateMonth) {
+    monthManualOverride = true;
+    badge.textContent = '✏️ กำหนดเอง';
+    badge.style.background = '#FEF3C7';
+    badge.style.color = '#92400E';
+  } else {
+    monthManualOverride = false;
+    badge.textContent = '🔒 ล็อคตามวันที่';
+    badge.style.background = '#DBEAFE';
+    badge.style.color = '#1E40AF';
+  }
+}
+
+// ─── INIT FORM: ล้างค่าทุกช่อง + ตั้ง date/month ────────────
+function initEntryForm() {
+  // ล้างทุก input[type=number] และ text
+  document.querySelectorAll('#page-entry input[type=number], #page-entry input[type=text]').forEach(el => {
+    el.value = '';
+  });
+  // ล้าง date และ hidden fields
+  document.getElementById('f-ac-date').value = '';
+  document.getElementById('f-event-days').value = '';
+  document.getElementById('f-water').value = '';
+  document.getElementById('f-meter-prev').value = '';
+  document.getElementById('f-meter-curr').value = '';
+
+  // ตั้ง date เป็นเมื่อวาน (เพราะกรอกข้อมูลย้อนหลัง 1 วัน)
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = yesterday.toISOString().split('T')[0];
+  document.getElementById('f-date').value = yStr;
+
+  // sync เดือนตาม date
+  monthManualOverride = false;
+  syncMonthFromDate();
+
+  // reset water display
+  const display = document.getElementById('water-calc-display');
+  if (display) { display.textContent = '—'; }
+
+  // ตั้ง AC date = วันนี้ และ lock
+  const todayStr = new Date().toISOString().split('T')[0];
+  const acDateEl = document.getElementById('f-ac-date');
+  acDateEl.value = todayStr;
+  acDateEl.disabled = true;
+  acDateEl.style.background = '#F0F4FF';
+  const btn = document.getElementById('btn-ac-date-edit');
+  if (btn) { btn.textContent = '✏️ แก้ไข'; btn.style.background = 'var(--off-white)'; btn.style.borderColor = 'var(--border)'; btn.style.color = 'var(--navy)'; }
+
+  // reset ac-ton กลับ default 2000
+  document.getElementById('f-ac-ton').value = '2000';
+}
+
+function toggleAcDateEdit() {
+  const inp = document.getElementById('f-ac-date');
+  const btn = document.getElementById('btn-ac-date-edit');
+  if (inp.disabled) {
+    inp.disabled = false;
+    inp.style.background = '';
+    btn.textContent = '🔒 ล็อควันนี้';
+    btn.style.background = '#FEF3C7';
+    btn.style.borderColor = '#FCD34D';
+    btn.style.color = '#92400E';
+  } else {
+    inp.disabled = true;
+    inp.style.background = '#F0F4FF';
+    // reset to today
+    inp.value = new Date().toISOString().split('T')[0];
+    btn.textContent = '✏️ แก้ไข';
+    btn.style.background = 'var(--off-white)';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--navy)';
+  }
+}
+
+function calcWaterUsage() {
+  const prev = parseFloat(document.getElementById('f-meter-prev').value);
+  const curr = parseFloat(document.getElementById('f-meter-curr').value);
+  const display = document.getElementById('water-calc-display');
+  const note    = document.getElementById('water-calc-note');
+  const hidden  = document.getElementById('f-water');
+  if (!isNaN(prev) && !isNaN(curr)) {
+    const usage = curr - prev;
+    if (usage < 0) {
+      display.textContent = '⚠️ ค่าผิดพลาด';
+      display.style.color = '#EF4444';
+      note.textContent = 'มิเตอร์ปัจจุบันต้องมากกว่าวันก่อนหน้า';
+      hidden.value = '';
+    } else {
+      display.textContent = usage.toLocaleString();
+      display.style.color = 'var(--accent)';
+      note.textContent = `(${curr.toLocaleString()} − ${prev.toLocaleString()})`;
+      hidden.value = usage;
+    }
+  } else {
+    display.textContent = '—';
+    display.style.color = 'var(--accent)';
+    note.textContent = '';
+    hidden.value = '';
+  }
+}
+
+function resetForm() {
+  document.querySelectorAll('.form-card input, .form-card select').forEach(el => {
+    if (el.type !== 'date') el.value = '';
+  });
+}
+
+const LAT = 13.6608, LON = 100.5954;
+
+// ─── 1) เมื่อวาน: ข้อมูลจริง (Archive) → อุณหภูมิ & ความชื้น section ───
+async function fetchWeatherYesterday() {
+  const dateVal = document.getElementById('f-date').value;
+  const btn = document.getElementById('weather-btn');
+  const status = document.getElementById('weather-status');
+  if (!dateVal) return;
+
+  btn.textContent = '⏳ กำลังดึงข้อมูล...';
+  btn.disabled = true;
+  status.style.display = 'none';
+
+  // Fetch hourly data to compute avg humidity 10:00-18:30 (hours 10-18)
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${LAT}&longitude=${LON}&start_date=${dateVal}&end_date=${dateVal}&hourly=temperature_2m,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,temperature_2m_mean&timezone=Asia%2FBangkok`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const d = data.daily;
+    const tMax  = d.temperature_2m_max[0];
+    const tMin  = d.temperature_2m_min[0];
+    const tMean = d.temperature_2m_mean[0];
+
+    // Hourly humidity: filter 09:00-18:00 (index 9-18 inclusive)
+    const hHourly = data.hourly.relative_humidity_2m; // 24 values for the day
+    const hSlice = hHourly.slice(9, 19); // indices 9-18 = 09:00-18:00
+    const hValid = hSlice.filter(v => v !== null);
+    const hMean = hValid.length > 0 ? hValid.reduce((a,b) => a+b, 0) / hValid.length : null;
+
+    document.getElementById('f-temp-avg').value     = tMean !== null ? tMean.toFixed(1) : '';
+    document.getElementById('f-temp-max').value     = tMax  !== null ? tMax.toFixed(1)  : '';
+    document.getElementById('f-temp-min').value     = tMin  !== null ? tMin.toFixed(1)  : '';
+    document.getElementById('f-humidity-out').value = hMean !== null ? hMean.toFixed(1) : '';
+
+    showWeatherStatus(`✅ ข้อมูลจริงเมื่อวาน — เฉลี่ย ${tMean?.toFixed(1)}°C  สูงสุด ${tMax?.toFixed(1)}°C  ต่ำสุด ${tMin?.toFixed(1)}°C  ความชื้น (09-18:00) ${hMean?.toFixed(1)}%RH`, 'ok');
+  } catch(e) {
+    showWeatherStatus('❌ ดึงข้อมูลไม่สำเร็จ: ' + e.message + ' — กรุณากรอกด้วยตนเอง', 'err');
+  } finally {
+    btn.textContent = '🌡️ ดึงข้อมูลอากาศ';
+    btn.disabled = false;
+  }
+}
+
+// ─── ปุ่มเดิมในฟอร์ม temp section ───
+function fetchWeather() { fetchWeatherYesterday(); }
+
+// ─── 2) วันนี้: พยากรณ์ (Forecast) → AC Operation section ───
+async function fetchWeatherToday() {
+  const btn = document.getElementById('ac-forecast-btn');
+  const statusEl = document.getElementById('ac-forecast-status');
+  btn.textContent = '⏳ กำลังดึง...';
+  btn.disabled = true;
+  statusEl.textContent = 'กำลังดึงข้อมูลพยากรณ์...';
+
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=relative_humidity_2m,temperature_2m&daily=temperature_2m_max&timezone=Asia%2FBangkok&forecast_days=1`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    // อุณหภูมิสูงสุดวันนี้
+    const tMax = data.daily.temperature_2m_max[0];
+
+    // ความชื้นเฉลี่ย 09:00-18:00 (index 9-18 inclusive)
+    const rhHourly = data.hourly.relative_humidity_2m; // 24 ค่า
+    const rhSlice  = rhHourly.slice(9, 19);
+    const rhValid  = rhSlice.filter(v => v !== null);
+    const rhMean   = rhValid.length > 0
+      ? rhValid.reduce((a, b) => a + b, 0) / rhValid.length
+      : null;
+
+    document.getElementById('f-ac-temp-max').value = tMax   !== null ? tMax.toFixed(1)   : '';
+    document.getElementById('f-ac-rh').value       = rhMean !== null ? rhMean.toFixed(1) : '';
+
+    // อัปเดต Dashboard AC card ทันที
+    document.getElementById('ac-temp').textContent = (tMax?.toFixed(1)   ?? '--') + '°C';
+    document.getElementById('ac-rh').textContent   = (rhMean?.toFixed(1) ?? '--') + '%RH';
+
+    const todayThai = thaiDate(new Date());
+    document.getElementById('ac-date').textContent = todayThai;
+    statusEl.textContent = `✅ พยากรณ์วันนี้ — สูงสุด ${tMax?.toFixed(1)}°C  ความชื้นเฉลี่ย 09-18:00 น. ${rhMean?.toFixed(1)}%RH`;
+  } catch(e) {
+    statusEl.textContent = '❌ ดึงพยากรณ์ไม่สำเร็จ: ' + e.message;
+  } finally {
+    btn.textContent = '🔄 รีเฟรช';
+    btn.disabled = false;
+  }
+}
+
+function showWeatherStatus(msg, type) {
+  const el = document.getElementById('weather-status');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.background = type === 'ok' ? '#D1FAE5' : type === 'warn' ? '#FEF3C7' : '#FEE2E2';
+  el.style.color      = type === 'ok' ? '#065F46' : type === 'warn' ? '#92400E' : '#991B1B';
+  el.style.border     = '1px solid ' + (type === 'ok' ? '#6EE7B7' : type === 'warn' ? '#FCD34D' : '#FCA5A5');
+}
+</script>
+</body>
+</html>
