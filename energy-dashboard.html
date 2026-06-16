@@ -685,7 +685,7 @@
 
     <!-- Monthly Energy Graph -->
     <div class="chart-card">
-      <div class="chart-title">กราฟพลังงานเดือนตุลาคม</div>
+      <div class="chart-title" id="energy-chart-title">กราฟพลังงานเดือนตุลาคม</div>
       <div class="chart-sub">การใช้พลังงานรายวัน (kWh) – เทียบแนวโน้ม</div>
       <!-- Legend -->
       <div style="display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 4px;align-items:center;">
@@ -1260,16 +1260,16 @@ let monthlyData = Array(31).fill(null);
 let demandData  = Array(31).fill(null);
 let avg2566     = 4154;
 let dataLoaded  = false;
+let monthData   = null; // global cache สำหรับ updateKpiFromDate
 
 // ─── LOAD FROM SHEETS ─────────────────────────────────
-// ใช้วันล่าสุดที่มีข้อมูลใน Sheets อัตโนมัติ ไม่มี nav
 let _currentYear  = new Date().getFullYear();
 let _currentMonth = new Date().getMonth() + 1;
 
 async function loadFromSheets(forceYear, forceMonth) {
   showApiStatus('loading');
   try {
-    let year, month, monthData;
+    let year, month;
 
     if (forceYear && forceMonth) {
       // เรียกจาก saveData หรือ date picker — ใช้ปี/เดือนที่ระบุ
@@ -1370,7 +1370,7 @@ async function loadFromSheets(forceYear, forceMonth) {
       // อัปเดตชื่อกราฟให้ตรงกับเดือนที่กำลังดู
       const MONTH_TH = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
                         'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-      const chartTitleEl = document.querySelector('#page-dashboard .chart-title');
+      const chartTitleEl = document.getElementById('energy-chart-title');
       if (chartTitleEl) chartTitleEl.textContent = `กราฟพลังงานเดือน${MONTH_TH[month]}`;
     }
 
@@ -1400,14 +1400,59 @@ async function loadFromSheets(forceYear, forceMonth) {
 // ─── LOAD FROM DATE PICKER ──────────────────────────────
 function loadFromDatePicker() {
   const dp = document.getElementById('dash-date-picker');
-  if (!dp || !dp.value) {
-    showApiStatus('err', 'กรุณาเลือกวันที่ก่อน');
+  if (!dp || !dp.value) { showApiStatus('err', 'กรุณาเลือกวันที่ก่อน'); return; }
+
+  const [y, m, d] = dp.value.split('-').map(Number);
+
+  // ถ้าเดือน/ปีเดิม → ไม่ต้อง fetch ใหม่ แค่อัปเดต KPI จาก cache
+  if (y === _currentYear && m === _currentMonth && monthData && monthData.rows) {
+    updateKpiFromDate(dp.value);
     return;
   }
-  const [y, m] = dp.value.split('-').map(Number);
-  // บันทึกไว้ใน localStorage
-  localStorage.setItem('lastSavedDate', `${y}-${m}`);
-  loadFromSheets(y, m);
+
+  // เดือนต่างกัน → อัปเดต nav แล้วโหลดใหม่
+  document.getElementById('nav-month').value = m;
+  const ySel = document.getElementById('nav-year');
+  if (ySel) ySel.value = y;
+  loadFromSheets();
+}
+
+// อัปเดต KPI + dashDate จากวันที่ที่เลือก (ไม่ fetch ใหม่)
+function updateKpiFromDate(dateStr) {
+  if (!monthData || !monthData.rows) return;
+  const fmt = n => n ? Number(parseFloat(n).toFixed(0)).toLocaleString() : '—';
+
+  // หา row ของวันที่เลือก
+  let row = monthData.rows.find(r => r.date === dateStr);
+  if (!row) {
+    showApiStatus('err', `ไม่มีข้อมูลวันที่ ${dateStr} ใน Sheets`);
+    return;
+  }
+
+  // KPI หลัก
+  document.getElementById('kpi-daily').innerHTML   = fmt(row.kwh) + '<span class="kpi-unit">kWh</span>';
+  document.getElementById('kpi-demand').innerHTML  = fmt(row.onpeak_kw) + '<span class="kpi-unit" style="color:var(--gold);">kW</span>';
+  if (row.total_water_m3) document.getElementById('kpi-water').textContent = fmt(row.total_water_m3);
+
+  // Energy Bands
+  document.getElementById('band-onpeak').textContent  = fmt(row.onpeak_kw)  || '—';
+  document.getElementById('band-offpeak').textContent = fmt(row.offpeak_kw) || '—';
+  document.getElementById('band-partial').textContent = fmt(row.partial_kw) || '—';
+
+  // อุณหภูมิ & ความชื้น
+  if (row.temp_out_day)   document.getElementById('temp-avg').textContent      = row.temp_out_day   + '°C';
+  if (row.temp_out_max)   document.getElementById('temp-max').textContent      = row.temp_out_max   + '°C';
+  if (row.temp_in_day)    document.getElementById('temp-in-day').textContent   = row.temp_in_day    + '°C';
+  if (row.temp_in_night)  document.getElementById('temp-in-night').textContent = row.temp_in_night  + '°C';
+  if (row.rh_out_day)     document.getElementById('humidity-out').textContent  = row.rh_out_day     + '%';
+  if (row.rh_in_day)      document.getElementById('humidity-in').textContent   = row.rh_in_day      + '%';
+
+  // dashDate (parse local ไม่ใช้ UTC)
+  const [dy, dm, dd] = dateStr.split('-').map(Number);
+  const dateObj = new Date(dy, dm - 1, dd);
+  document.getElementById('dashDate').textContent = dateObj.toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+
+  showApiStatus('ok', `แสดงข้อมูลวันที่ ${dateStr}`);
 }
 
 function showApiStatus(type, msg) {
