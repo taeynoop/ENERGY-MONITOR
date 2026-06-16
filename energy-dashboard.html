@@ -1318,6 +1318,7 @@ function shiftMonth(delta) {
 function onNavChange() { loadFromSheets(); }
 
 async function loadFromSheets() {
+  clearKpis();
   showApiStatus('loading');
   try {
     // ใช้ nav เสมอ (nav ถูก init ก่อนเรียกครั้งแรกแล้ว)
@@ -1509,6 +1510,30 @@ function showApiStatus(type, msg) {
   el.style.cssText = `${styles[type]}border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;`;
   el.textContent = `${icons[type]} ${msg || (type === 'loading' ? 'กำลังโหลดข้อมูลจาก Google Sheets...' : '')}`;
   el.style.display = 'block';
+  // ซ่อนอัตโนมัติหลัง 5 วินาที (ยกเว้น loading)
+  if (type !== 'loading') {
+    clearTimeout(el._hideTimer);
+    el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, 5000);
+  }
+}
+
+// ล้าง KPI ก่อนโหลดเดือนใหม่
+function clearKpis() {
+  const ids = ['kpi-daily','kpi-demand','kpi-max','kpi-min','kpi-water',
+               'band-onpeak','band-offpeak','band-partial',
+               'temp-avg','temp-max','temp-in-day','temp-in-night',
+               'humidity-out','humidity-in','cost-demand','cost-energy'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
+  document.getElementById('kpi-daily').innerHTML  = '—<span class="kpi-unit">kWh</span>';
+  document.getElementById('kpi-demand').innerHTML = '—<span class="kpi-unit" style="color:var(--gold);">kW</span>';
+  document.getElementById('kpi-max').innerHTML    = '—<span class="kpi-unit">kWh</span>';
+  document.getElementById('kpi-min').innerHTML    = '—<span class="kpi-unit">kWh</span>';
+  document.getElementById('kpi-max-date').textContent = 'รอข้อมูล';
+  document.getElementById('kpi-min-date').textContent = 'รอข้อมูล';
+  document.getElementById('dashDate').textContent = '— รอข้อมูล —';
 }
 
 function refreshCharts() {
