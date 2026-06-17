@@ -1549,7 +1549,7 @@ function renderDayType(year, month) {
   // กราฟแท่ง = ค่าเฉลี่ยต่อวัน
   if (window._dayTypeChart) {
     window._dayTypeChart.data.datasets[0].data = [avg(wdArr), avg(weArr), avg(evArr)];
-    window._dayTypeChart.update();
+    window._dayTypeChart.update('none');
   }
 
   // ตัวเลขรวมทั้งเดือน
@@ -1572,16 +1572,50 @@ function renderTempChart(year, month) {
   monthRows.forEach(row => {
     const d = parseInt(row.date.split('-')[2]) - 1;
     if (d < 0 || d >= daysInMo) return;
-    if (row.temp_out_day !== '' && row.temp_out_day != null) outArr[d] = parseFloat(row.temp_out_day);
-    if (row.temp_in_day  !== '' && row.temp_in_day  != null) inArr[d]  = parseFloat(row.temp_in_day);
+    const tOut = parseFloat(row.temp_out_day);
+    const tIn  = parseFloat(row.temp_in_day);
+    if (!isNaN(tOut) && tOut > 0) outArr[d] = tOut;
+    if (!isNaN(tIn)  && tIn  > 0) inArr[d]  = tIn;
   });
 
+  // destroy + recreate เพื่อให้ label count เปลี่ยนได้ถูกต้อง
   if (window._tempChart) {
-    window._tempChart.data.labels = labels;
-    window._tempChart.data.datasets[0].data = outArr; // ภายนอก
-    window._tempChart.data.datasets[1].data = inArr;  // ภายใน
-    window._tempChart.update();
+    window._tempChart.destroy();
+    window._tempChart = null;
   }
+  const tempCtx = document.getElementById('tempChart');
+  if (!tempCtx) return;
+  window._tempChart = new Chart(tempCtx.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'ภายนอก', data: outArr,
+          borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,.05)',
+          borderWidth: 2, tension: .35, pointRadius: 2, pointBackgroundColor: '#EF4444',
+          spanGaps: true, fill: false
+        },
+        {
+          label: 'ภายใน', data: inArr,
+          borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,.05)',
+          borderWidth: 2, tension: .35, pointRadius: 2, pointBackgroundColor: '#3B82F6',
+          spanGaps: true, fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}°C` } }
+      },
+      scales: {
+        x: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 9 }, color: '#5A6E9A', maxTicksLimit: 16 } },
+        y: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 9 }, color: '#5A6E9A', callback: v => v+'°' } }
+      }
+    }
+  });
 
   const titleEl = document.getElementById('temp-chart-title');
   if (titleEl) titleEl.textContent = `กราฟอุณหภูมิรายวัน เดือน${MONTH_TH[month]}`;
@@ -1647,37 +1681,8 @@ window._dayTypeChart = new Chart(dayTypeCtx, {
   }
 });
 
-// กราฟเส้น: อุณหภูมิภายใน/ภายนอก ทั้งเดือน
-const tempCtx = document.getElementById('tempChart').getContext('2d');
-window._tempChart = new Chart(tempCtx, {
-  type: 'line',
-  data: {
-    labels: [],
-    datasets: [
-      {
-        label: 'ภายนอก', data: [], borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,.05)',
-        borderWidth: 2, tension: .35, pointRadius: 2, pointBackgroundColor: '#EF4444',
-        spanGaps: false, fill: false
-      },
-      {
-        label: 'ภายใน', data: [], borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,.05)',
-        borderWidth: 2, tension: .35, pointRadius: 2, pointBackgroundColor: '#3B82F6',
-        spanGaps: false, fill: false
-      }
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}°C` } }
-    },
-    scales: {
-      x: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 9 }, color: '#5A6E9A', maxTicksLimit: 16 } },
-      y: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 9 }, color: '#5A6E9A', callback: v => v+'°' } }
-    }
-  }
-});
+// กราฟเส้น: อุณหภูมิภายใน/ภายนอก ทั้งเดือน — สร้างใหม่ทุกครั้งใน renderTempChart()
+window._tempChart = null;
 
 // Energy monthly line
 const eCtx = document.getElementById('energyChart').getContext('2d');
