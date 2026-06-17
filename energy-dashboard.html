@@ -30,6 +30,7 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { overflow-x: hidden; }
 
   body {
     font-family: var(--font-body);
@@ -46,11 +47,13 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 28px;
-    height: 60px;
+    min-height: 60px;
     position: sticky;
     top: 0;
     z-index: 100;
     box-shadow: 0 2px 12px rgba(10,31,68,.4);
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .topbar-brand {
     display: flex;
@@ -134,6 +137,90 @@
   .grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
   .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
   .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
+
+  /* ── Responsive ─────────────────────────────────────── */
+  @media (max-width: 768px) {
+    /* Topbar */
+    .topbar { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+    .topbar-nav { gap: 4px; flex-wrap: wrap; }
+    .nav-btn { font-size: 11px; padding: 6px 10px; }
+
+    /* Grids → 1 column */
+    .grid-4, .grid-3, .grid-2, .grid-2-1, .grid-1-2 {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* ROW 2 inline grid */
+    [style*="grid-template-columns:1fr 2fr"],
+    [style*="grid-template-columns:2fr 1fr"],
+    [style*="grid-template-columns: 1fr 2fr"],
+    [style*="grid-template-columns: 2fr 1fr"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* อุณหภูมิ 6 ค่า → 3 คอลัมน์ */
+    [style*="grid-template-columns:repeat(6,1fr)"],
+    [style*="grid-template-columns: repeat(6,1fr)"] {
+      grid-template-columns: repeat(3,1fr) !important;
+    }
+
+    /* Cost row */
+    .cost-row { grid-template-columns: 1fr !important; }
+
+    /* Form */
+    .form-grid { grid-template-columns: 1fr !important; }
+
+    /* Band row → wrap */
+    .band-row { flex-wrap: wrap; }
+    .band-card { min-width: calc(50% - 8px); }
+
+    /* KPI value ย่อลง */
+    .kpi-value { font-size: 28px !important; }
+    #kpi-demand { font-size: 32px !important; }
+
+    /* Cost val */
+    .cost-val { font-size: 18px !important; }
+    #kpi-annual { font-size: 22px !important; }
+
+    /* Page padding */
+    .page { padding: 14px; }
+    .dashboard-header { padding: 0 0 10px; }
+
+    /* Section header */
+    .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+    /* Chart card */
+    .chart-card { padding: 14px; }
+
+    /* Calendar grid (7 cols — คงไว้) */
+    #event-calendar { font-size: 11px; }
+
+    /* temp-val ย่อ */
+    .temp-val { font-size: 16px !important; }
+
+    /* Report date badge */
+    .report-date { font-size: 11px; padding: 4px 10px; }
+
+    /* Water card */
+    .water-card { flex-direction: column !important; text-align: center; gap: 4px; }
+
+    /* Date picker area */
+    [style*="display:flex"][style*="align-items:center"][style*="gap:10px"] {
+      flex-wrap: wrap;
+    }
+
+    /* AC card */
+    .ac-grid { grid-template-columns: repeat(2,1fr) !important; }
+  }
+
+  @media (max-width: 480px) {
+    /* Ultra narrow — ปรับเพิ่มเติม */
+    .topbar-brand { font-size: 13px; }
+    .kpi-value { font-size: 24px !important; }
+    #kpi-demand { font-size: 28px !important; }
+    .band-card { min-width: 100%; }
+    .temp-val { font-size: 14px !important; }
+  }
 
   /* ─── KPI CARD ─── */
   .kpi-card {
@@ -580,10 +667,10 @@
 
   <div class="spacer"></div>
 
-  <!-- ROW 2: Energy Bands + Donut + Temp -->
-  <div style="display:grid;grid-template-columns:1.2fr 0.8fr 1fr;gap:16px;">
+  <!-- ROW 2: ซ้าย(bands+bar) | ขวา(temp numbers + temp line) -->
+  <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;">
 
-    <!-- Energy Time Bands -->
+    <!-- ซ้าย: Energy Bands + กราฟแท่งแยกตามวัน -->
     <div class="chart-card">
       <div class="chart-title">ช่วงเวลาการใช้พลังงาน</div>
       <div class="chart-sub">Energy Time Bands – ประจำวัน</div>
@@ -604,76 +691,61 @@
           <div class="band-unit">kWh</div>
         </div>
       </div>
+
       <div style="margin-top:18px;">
-        <div class="chart-title" style="font-size:12px;margin-bottom:8px;">สัดส่วนตาม Chiller vs ศูนยการค้า</div>
-        <div class="prog-wrap">
-          <div class="prog-row">
-            <div class="prog-label">Chiller</div>
-            <div class="prog-bar"><div class="prog-fill" style="width:0%;background:var(--accent-soft);"></div></div>
-            <div class="prog-val" id="pct-chiller">—</div>
+        <div class="chart-title" style="font-size:13px;margin-bottom:2px;">การใช้พลังงานแยกตามประเภทวัน</div>
+        <div class="chart-sub" style="font-size:11px;margin-bottom:8px;">kWh เฉลี่ยต่อวัน (ทั้งเดือน)</div>
+        <div style="height:150px;"><canvas id="dayTypeChart"></canvas></div>
+        <!-- ตัวเลขรวมทั้งเดือน -->
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;font-size:11px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:2px;background:#1E4A9C;"></span>จ-ศ</span>
+            <span><b id="sum-wd" style="font-family:var(--font-mono);color:var(--navy);">—</b> kWh <span id="cnt-wd" style="color:var(--text-muted);"></span></span>
           </div>
-          <div class="prog-row">
-            <div class="prog-label">ศูนย์การค้า</div>
-            <div class="prog-bar"><div class="prog-fill" style="width:0%;background:var(--navy);"></div></div>
-            <div class="prog-val" id="pct-mall">—</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:2px;background:#3B82F6;"></span>ส-อา</span>
+            <span><b id="sum-we" style="font-family:var(--font-mono);color:var(--navy);">—</b> kWh <span id="cnt-we" style="color:var(--text-muted);"></span></span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:2px;background:#F59E0B;"></span>Event</span>
+            <span><b id="sum-ev" style="font-family:var(--font-mono);color:var(--navy);">—</b> kWh <span id="cnt-ev" style="color:var(--text-muted);"></span></span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Donut: Day type breakdown -->
-    <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
-      <div class="chart-title" style="text-align:center;">การใช้พลังงานแยกตามวัน</div>
-      <div class="chart-sub" style="text-align:center;">สัดส่วน % ต่อประเภทวัน</div>
-      <div class="donut-wrap">
-        <canvas id="donutChart"></canvas>
-        <div class="donut-center">
-          <div class="donut-big">—</div>
-          <div class="donut-sm">รวมทั้งหมด</div>
+    <!-- ขวา: ตัวเลขอุณหภูมิ (ครึ่งบน) + กราฟอุณหภูมิทั้งเดือน (ครึ่งล่าง) -->
+    <div class="chart-card" style="display:flex;flex-direction:column;">
+      <!-- ครึ่งบน: ตัวเลข เรียงแนวนอน 6 ค่า -->
+      <div>
+        <div class="chart-title">อุณหภูมิ &amp; ความชื้น</div>
+        <div class="chart-sub">สภาพแวดล้อมประจำวัน</div>
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:10px;">
+          <div class="temp-item"><div class="temp-val" style="font-size:20px;" id="temp-avg">—</div><div class="temp-lbl">ภายนอก<br>เฉลี่ย</div></div>
+          <div class="temp-item"><div class="temp-val" style="font-size:20px;" id="temp-max">—</div><div class="temp-lbl">ภายนอก<br>สูงสุด</div></div>
+          <div class="temp-item"><div class="temp-val" style="font-size:20px;" id="temp-in-day">—</div><div class="temp-lbl">ภายใน<br>กลางวัน</div></div>
+          <div class="temp-item"><div class="temp-val" style="font-size:20px;" id="temp-in-night">—</div><div class="temp-lbl">ภายใน<br>กลางคืน</div></div>
+          <div class="temp-item"><div class="temp-val" style="font-size:20px;" id="humidity-out">—</div><div class="temp-lbl">ความชื้น<br>ภายนอก</div></div>
+          <div class="temp-item"><div class="temp-val" style="font-size:20px;" id="humidity-in">—</div><div class="temp-lbl">ความชื้น<br>ภายใน</div></div>
         </div>
       </div>
-      <div style="margin-top:14px;width:100%;">
-        <div class="legend" style="justify-content:center;">
-          <div class="legend-item"><div class="legend-dot" style="background:#1E4A9C;"></div> จ-ศ <span id="legend-wd">—</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#3B82F6;"></div> ส-อา <span id="legend-we">—</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#F59E0B;"></div> Event <span id="legend-ev">—</span></div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Temperature + Humidity -->
-    <div class="chart-card">
-      <div class="chart-title">อุณหภูมิ & ความชื้น</div>
-      <div class="chart-sub">สภาพแวดล้อมประจำวัน</div>
-      <div class="temp-row">
-        <div class="temp-item">
-          <div class="temp-val" id="temp-avg">—</div>
-          <div class="temp-lbl">ภายนอกเฉลี่ย</div>
+      <div class="divider" style="margin:16px 0 12px;"></div>
+
+      <!-- ครึ่งล่าง: กราฟเส้นอุณหภูมิทั้งเดือน -->
+      <div style="flex:1;display:flex;flex-direction:column;">
+        <div class="chart-title" style="font-size:13px;" id="temp-chart-title">กราฟอุณหภูมิรายวัน</div>
+        <div style="display:flex;gap:14px;margin:6px 0 8px;">
+          <div style="display:flex;align-items:center;gap:5px;">
+            <div style="width:20px;height:3px;background:#EF4444;border-radius:2px;"></div>
+            <span style="font-size:10px;color:#5A6E9A;">อุณหภูมิภายนอก</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;">
+            <div style="width:20px;height:3px;background:#3B82F6;border-radius:2px;"></div>
+            <span style="font-size:10px;color:#5A6E9A;">อุณหภูมิภายใน</span>
+          </div>
         </div>
-        <div class="temp-item">
-          <div class="temp-val" id="temp-max">—</div>
-          <div class="temp-lbl">ภายนอกสูงสุด</div>
-        </div>
-      </div>
-      <div class="temp-row">
-        <div class="temp-item">
-          <div class="temp-val" id="temp-in-day">—</div>
-          <div class="temp-lbl">ภายในกลางวัน<br>(10:00–18:00)</div>
-        </div>
-        <div class="temp-item">
-          <div class="temp-val" id="temp-in-night">—</div>
-          <div class="temp-lbl">ภายในกลางคืน<br>(18:00–20:00)</div>
-        </div>
-      </div>
-      <div style="margin-top:12px; display:flex; gap:10px;">
-        <div class="temp-item" style="flex:1;">
-          <div class="temp-val" style="font-size:20px;" id="humidity-out">—</div>
-          <div class="temp-lbl">ความชื้นสัมพัทธ์ภายนอก</div>
-        </div>
-        <div class="temp-item" style="flex:1;">
-          <div class="temp-val" style="font-size:20px;" id="humidity-in">—</div>
-          <div class="temp-lbl">ความชื้นสัมพัทธ์ภายใน</div>
-        </div>
+        <div style="flex:1;min-height:160px;"><canvas id="tempChart"></canvas></div>
       </div>
     </div>
   </div>
@@ -864,10 +936,6 @@
         <div class="form-group">
           <label>การใช้พลังงานสะสมปี (Annual)</label>
           <div class="input-unit"><input type="number" id="f-annual" placeholder="21636340.80"><div class="unit-suffix">kWh/Year</div></div>
-        </div>
-        <div class="form-group">
-          <label>สัดส่วน Chiller</label>
-          <div class="input-unit"><input type="number" id="f-chiller-pct" placeholder="26" min="0" max="100"><div class="unit-suffix">%</div></div>
         </div>
         <div class="form-group">
           <label>เปรียบเทียบค่าเฉลี่ยปี 2566</label>
@@ -1400,8 +1468,9 @@ function renderMonth(month) {
   const titleEl = document.getElementById('energy-chart-title');
   if (titleEl) titleEl.textContent = `กราฟพลังงานเดือน${MONTH_TH[month]}`;
 
-  // Donut (สัดส่วนประเภทวัน)
-  renderDonut(loadedYear, month);
+  // กราฟแท่งแยกตามประเภทวัน + กราฟอุณหภูมิทั้งเดือน
+  renderDayType(loadedYear, month);
+  renderTempChart(loadedYear, month);
 
   recalcRates();
 }
@@ -1459,30 +1528,63 @@ function renderDay(dateStr) {
   showApiStatus('ok', `แสดงข้อมูลวันที่ ${dd} ${MONTH_TH[mm]} ${yy+543}`);
 }
 
-// ─── DONUT: สัดส่วนประเภทวันในเดือน ──────────────────────────
-function renderDonut(year, month) {
-  const daysInMo = new Date(year, month, 0).getDate();
-  let wd = 0, we = 0, ev = 0;
-  // ดึง event days จาก localStorage (ที่กรอกไว้)
+// ─── กราฟแท่ง: kWh เฉลี่ยต่อวันแยกตามประเภท + รวมทั้งเดือน ────
+function renderDayType(year, month) {
   const evSet = (typeof eventDays !== 'undefined' && eventDays) ? eventDays : new Set();
-  for (let d = 1; d <= daysInMo; d++) {
-    const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  // จัดกลุ่ม kWh ตามประเภทวัน (เฉพาะวันที่มีข้อมูล)
+  let wdArr = [], weArr = [], evArr = [];
+  monthRows.forEach(row => {
+    if (row.kwh === '' || row.kwh == null) return;
+    const kwh = parseFloat(row.kwh);
+    const d   = parseInt(row.date.split('-')[2]);
     const dow = new Date(year, month-1, d).getDay();
-    if (evSet.has(ds)) ev++;
-    else if (dow === 0 || dow === 6) we++;
-    else wd++;
+    if (evSet.has(row.date))           evArr.push(kwh);
+    else if (dow === 0 || dow === 6)   weArr.push(kwh);
+    else                               wdArr.push(kwh);
+  });
+
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+  const sum = arr => arr.reduce((a,b)=>a+b,0);
+
+  // กราฟแท่ง = ค่าเฉลี่ยต่อวัน
+  if (window._dayTypeChart) {
+    window._dayTypeChart.data.datasets[0].data = [avg(wdArr), avg(weArr), avg(evArr)];
+    window._dayTypeChart.update();
   }
-  const wdP = Math.round(wd/daysInMo*100);
-  const weP = Math.round(we/daysInMo*100);
-  const evP = 100 - wdP - weP;
-  if (window._donutChart) {
-    window._donutChart.data.datasets[0].data = [wdP, weP, evP];
-    window._donutChart.update();
+
+  // ตัวเลขรวมทั้งเดือน
+  const setHtml = (id, v) => { const e=document.getElementById(id); if(e) e.textContent = v; };
+  setHtml('sum-wd', numFmt(sum(wdArr)));
+  setHtml('sum-we', numFmt(sum(weArr)));
+  setHtml('sum-ev', numFmt(sum(evArr)));
+  setHtml('cnt-wd', `(${wdArr.length} วัน)`);
+  setHtml('cnt-we', `(${weArr.length} วัน)`);
+  setHtml('cnt-ev', `(${evArr.length} วัน)`);
+}
+
+// ─── กราฟเส้นอุณหภูมิทั้งเดือน (ภายใน/ภายนอก) ─────────────────
+function renderTempChart(year, month) {
+  const daysInMo = new Date(year, month, 0).getDate();
+  const labels = Array.from({length: daysInMo}, (_, i) => i + 1);
+  const outArr = Array(daysInMo).fill(null);
+  const inArr  = Array(daysInMo).fill(null);
+
+  monthRows.forEach(row => {
+    const d = parseInt(row.date.split('-')[2]) - 1;
+    if (d < 0 || d >= daysInMo) return;
+    if (row.temp_out_day !== '' && row.temp_out_day != null) outArr[d] = parseFloat(row.temp_out_day);
+    if (row.temp_in_day  !== '' && row.temp_in_day  != null) inArr[d]  = parseFloat(row.temp_in_day);
+  });
+
+  if (window._tempChart) {
+    window._tempChart.data.labels = labels;
+    window._tempChart.data.datasets[0].data = outArr; // ภายนอก
+    window._tempChart.data.datasets[1].data = inArr;  // ภายใน
+    window._tempChart.update();
   }
-  const big = document.querySelector('.donut-big');
-  if (big) big.textContent = '100%';
-  const set = (id,v) => { const e=document.getElementById(id); if(e) e.textContent = v+'%'; };
-  set('legend-wd', wdP); set('legend-we', weP); set('legend-ev', evP);
+
+  const titleEl = document.getElementById('temp-chart-title');
+  if (titleEl) titleEl.textContent = `กราฟอุณหภูมิรายวัน เดือน${MONTH_TH[month]}`;
 }
 
 // ─── ล้างค่าทั้งหมด ───────────────────────────────────────────
@@ -1490,7 +1592,7 @@ function clearAll() {
   const dash = id => { const e=document.getElementById(id); if(e) e.textContent='—'; };
   ['band-onpeak','band-offpeak','band-partial','temp-avg','temp-max',
    'temp-in-day','temp-in-night','humidity-out','humidity-in',
-   'kpi-water','pct-chiller','pct-mall'].forEach(dash);
+   'kpi-water'].forEach(dash);
   document.getElementById('kpi-daily').innerHTML  = '—<span class="kpi-unit">kWh</span>';
   document.getElementById('kpi-demand').innerHTML = '—<span class="kpi-unit" style="color:var(--gold);">kW</span>';
   document.getElementById('kpi-max').innerHTML    = '—<span class="kpi-unit">kWh</span>';
@@ -1519,22 +1621,61 @@ async function initDashboard() {
 let demandChartInstance = null;
 
 // ─── CHARTS ───
-// Donut
-const donutCtx = document.getElementById('donutChart').getContext('2d');
-window._donutChart = new Chart(donutCtx, {
-  type: 'doughnut',
+// กราฟแท่ง: kWh เฉลี่ยต่อวันแยกตามประเภท
+const dayTypeCtx = document.getElementById('dayTypeChart').getContext('2d');
+window._dayTypeChart = new Chart(dayTypeCtx, {
+  type: 'bar',
   data: {
     labels: ['จ-ศ','ส-อา','Event'],
     datasets: [{
       data: [0, 0, 0],
       backgroundColor: ['#1E4A9C','#3B82F6','#F59E0B'],
-      borderWidth: 0,
-      hoverOffset: 6
+      borderRadius: 6,
+      maxBarThickness: 48
     }]
   },
   options: {
-    cutout: '65%',
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` } } }
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toLocaleString()} kWh/วัน` } }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#5A6E9A' } },
+      y: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 9 }, color: '#5A6E9A', callback: v => (v/1000).toFixed(0)+'k' } }
+    }
+  }
+});
+
+// กราฟเส้น: อุณหภูมิภายใน/ภายนอก ทั้งเดือน
+const tempCtx = document.getElementById('tempChart').getContext('2d');
+window._tempChart = new Chart(tempCtx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      {
+        label: 'ภายนอก', data: [], borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,.05)',
+        borderWidth: 2, tension: .35, pointRadius: 2, pointBackgroundColor: '#EF4444',
+        spanGaps: false, fill: false
+      },
+      {
+        label: 'ภายใน', data: [], borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,.05)',
+        borderWidth: 2, tension: .35, pointRadius: 2, pointBackgroundColor: '#3B82F6',
+        spanGaps: false, fill: false
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}°C` } }
+    },
+    scales: {
+      x: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 9 }, color: '#5A6E9A', maxTicksLimit: 16 } },
+      y: { grid: { color: '#E8EDF5' }, ticks: { font: { size: 9 }, color: '#5A6E9A', callback: v => v+'°' } }
+    }
   }
 });
 
@@ -1760,8 +1901,6 @@ function saveData() {
   const offpeak = document.getElementById('f-offpeak').value;
   const partial = document.getElementById('f-partial').value;
   const annual = document.getElementById('f-annual').value;
-  const chillerPct = document.getElementById('f-chiller-pct').value;
-  const mallPct = 100 - Number(chillerPct);
   const compare = document.getElementById('f-compare').value;
   const tempAvg = document.getElementById('f-temp-avg').value;
   const tempMax = document.getElementById('f-temp-max').value;
@@ -1823,40 +1962,6 @@ function saveData() {
   document.getElementById('band-onpeak').textContent = fmt(onpeak);
   document.getElementById('band-offpeak').textContent = fmt(offpeak);
   document.getElementById('band-partial').textContent = fmt(partial);
-
-  // Proportions
-  document.getElementById('pct-chiller').textContent = chillerPct + '%';
-  document.getElementById('pct-mall').textContent = mallPct + '%';
-  document.querySelector('.prog-row:first-child .prog-fill').style.width = chillerPct + '%';
-  document.querySelector('.prog-row:last-child .prog-fill').style.width = mallPct + '%';
-
-  // Donut: คำนวณ % วันประเภทต่างๆ จาก eventDays ในเดือนนั้น
-  if (dateRaw) {
-    const [yr, mo] = dateRaw.split('-').map(Number);
-    const daysInMo = new Date(yr, mo, 0).getDate();
-    let wdCount = 0, weCount = 0, evCount = 0;
-    for (let d = 1; d <= daysInMo; d++) {
-      const dStr = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const dow = new Date(dStr).getDay(); // 0=Sun,6=Sat
-      if (eventDays.has(dStr)) evCount++;
-      else if (dow === 0 || dow === 6) weCount++;
-      else wdCount++;
-    }
-    const wdPct = Math.round(wdCount/daysInMo*100);
-    const wePct = Math.round(weCount/daysInMo*100);
-    const evPct = 100 - wdPct - wePct;
-    if (window._donutChart) {
-      window._donutChart.data.datasets[0].data = [wdPct, wePct, evPct];
-      window._donutChart.update();
-    }
-    document.querySelector('.donut-big').textContent = '100%';
-    const lwd = document.getElementById('legend-wd');
-    const lwe = document.getElementById('legend-we');
-    const lev = document.getElementById('legend-ev');
-    if (lwd) lwd.textContent = wdPct + '%';
-    if (lwe) lwe.textContent = wePct + '%';
-    if (lev) lev.textContent = evPct + '%';
-  }
 
   // Temp
   document.getElementById('temp-avg').textContent = tempAvg + '°C';
