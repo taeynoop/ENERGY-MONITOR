@@ -651,7 +651,7 @@
     <div class="kpi-card" style="background:linear-gradient(135deg,#1E3A8A,#2563EB);border-color:#1E3A8A;box-shadow:0 6px 24px rgba(37,99,235,.35);">
       <div class="kpi-label" style="color:rgba(255,255,255,.65);">ความต้องการพลังงาน/วัน</div>
       <div class="kpi-value" style="color:#fff;font-size:44px;" id="kpi-demand">—<span class="kpi-unit" style="color:var(--gold);">kW</span></div>
-      <div class="kpi-sub" style="color:rgba(255,255,255,.6);">เทียบเฉลี่ยปี 2566 <span class="badge" style="background:rgba(16,185,129,.2);color:#6EE7B7;" id="kpi-compare">+0.31%</span></div>
+      <div class="kpi-sub" style="color:rgba(255,255,255,.6);">เทียบเฉลี่ย <span id="demand-avg-label">ปี 2566</span> <span class="badge" style="background:rgba(16,185,129,.2);color:#6EE7B7;" id="kpi-compare">+0.31%</span></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">พลังงานสูงสุด / เดือน</div>
@@ -798,7 +798,7 @@
     <!-- Demand kW Chart -->
     <div class="chart-card">
       <div class="chart-title">ความต้องการพลังงานไฟฟ้า On-Peak</div>
-      <div class="chart-sub">kW รายวัน เทียบค่าสูงสุด/ต่ำสุด และค่าเฉลี่ยปี 2566</div>
+      <div class="chart-sub" id="demand-chart-sub">kW รายวัน เทียบค่าสูงสุด/ต่ำสุด และค่าเฉลี่ยปี 2566</div>
       <!-- Legend -->
       <div style="display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 4px;align-items:center;">
         <div style="display:flex;align-items:center;gap:5px;">
@@ -1320,6 +1320,22 @@ function showPage(name) {
 const API_URL = 'https://script.google.com/macros/s/AKfycbzcPR43CQ-oVMiNmZ-w9IAMKw8PB6DJg2w27249FnzHC3J2SoqsA9upjR0En073zc-_ng/exec';
 
 // ─── DATA ARRAYS (จะถูกแทนที่ด้วยข้อมูลจาก Sheets) ──
+// อัปเดต KPI compare badge จาก demand ปัจจุบัน vs avg ปีก่อน
+function updateCompare() {
+  const demandEl = document.getElementById('kpi-demand');
+  if (!demandEl || !avg2566) return;
+  const cur = parseFloat(String(demandEl.textContent).replace(/[^0-9.]/g,''));
+  if (isNaN(cur) || cur <= 0) return;
+  const diff = ((cur - avg2566) / avg2566 * 100);
+  const cmp = document.getElementById('kpi-compare');
+  if (cmp) {
+    cmp.textContent = (diff >= 0 ? '+' : '') + diff.toFixed(2) + '%';
+    cmp.style.cssText = diff >= 0
+      ? 'background:rgba(16,185,129,.2);color:#6EE7B7;'
+      : 'background:rgba(239,68,68,.2);color:#FCA5A5;';
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // DATA LAYER — เขียนใหม่ทั้งหมด (สะอาด ตรงไปตรงมา)
 // ═══════════════════════════════════════════════════════════════
@@ -1400,11 +1416,37 @@ async function fetchMonth(year, month) {
       if (row.onpeak_kw !== '' && row.onpeak_kw != null) demandData[day]  = parseFloat(row.onpeak_kw);
     });
 
-    // baseline ของเดือนนี้
+    // baseline ของเดือนนี้ (จาก baseline sheet เดิม สำรองไว้ถ้า yearAvg ไม่มีข้อมูล)
     if (baseJson.rows) {
       const bl = baseJson.rows.find(r => parseInt(r.month) === month);
       if (bl && bl.avg_kwh_per_day) avg2566 = parseFloat(bl.avg_kwh_per_day);
     }
+
+    // ดึงค่าเฉลี่ย onpeak_kw ของปีก่อนหน้า
+    const prevYear = year - 1;
+    fetch(`${API_URL}?action=getYearAvg&year=${prevYear}`, { redirect: 'follow' })
+      .then(r => r.json())
+      .then(res => {
+        if (res.months && res.months.length > 0) {
+          // หาค่า avg ของเดือนนั้น (ถ้ามี) หรือใช้ค่า avg ทั้งปี
+          const mo = res.months.find(m => m.month === month);
+          const prevAvg = mo ? mo.avg_onpeak_kw
+                             : res.months.reduce((a,b)=>a+b.avg_onpeak_kw,0)/res.months.length;
+          avg2566 = prevAvg;
+          // อัปเดต demand chart line + label
+          if (window._demandChart && window._demandChart.data.datasets[1]) {
+            window._demandChart.data.datasets[1].data = Array(31).fill(prevAvg);
+            window._demandChart.update('none');
+          }
+          // อัปเดต label ใน chart subtitle
+          const sub = document.getElementById('demand-avg-label');
+          if (sub) sub.textContent = `ปี ${prevYear + 543}`;
+          const chartSub = document.getElementById('demand-chart-sub');
+          if (chartSub) chartSub.textContent = `kW รายวัน เทียบค่าสูงสุด/ต่ำสุด และค่าเฉลี่ยปี ${prevYear + 543}`;
+          // อัปเดต KPI badge เปรียบเทียบ
+          updateCompare();
+        }
+      }).catch(() => {});  // ถ้าไม่มีข้อมูลปีก่อน ใช้ baseline เดิม
 
     // วาดกราฟทั้งเดือน
     renderMonth(month);
